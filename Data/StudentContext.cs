@@ -9,12 +9,12 @@ namespace credirect_api.Data
 
         public DbSet<StudentDetail> StudentDetail { get; set; }
         public DbSet<Client> Client { get; set; }
-        public DbSet<ClientIdentity> ClientIdentitie { get; set; }
-        public DbSet<MaritalStatus> MaritalStatuse { get; set; }
-        public DbSet<ResidencyStatus> ResidencyStatuse { get; set; }
-        public DbSet<BusinessActivity> BusinessActivitie { get; set; }
+        public DbSet<ClientIdentity> ClientIdentity { get; set; }
+        public DbSet<MaritalStatus> MaritalStatus { get; set; }
+        public DbSet<ResidencyStatus> ResidencyStatus { get; set; }
+        public DbSet<BusinessActivity> BusinessActivity { get; set; }
         public DbSet<ClientTitle> ClientTitle { get; set; }
-        public DbSet<ClientCountry> ClientCountrie { get; set; }
+        public DbSet<ClientCountry> ClientCountry { get; set; }
         public DbSet<ManagerInformation> ManagerInformation { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
