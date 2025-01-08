@@ -1,0 +1,16 @@
+# Visual Studio specific files
+.vs/
+*.suo
+*.vscode
+
+# Build output directories
+bin/
+obj/
+
+# Cache files
+*.dbcache.v2
+*.vsidx
+
+# Temporary files
+*.pdb
+*.dll
