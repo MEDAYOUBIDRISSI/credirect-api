@@ -7,6 +7,6 @@ namespace credirect_api.Data
     {
         public StudentContext(DbContextOptions<StudentContext> options) : base(options) { }
 
-        public DbSet<StudentDetail> StudentDetails { get; set; }
+        public DbSet<StudentDetail> StudentDetail { get; set; }
     }
 }

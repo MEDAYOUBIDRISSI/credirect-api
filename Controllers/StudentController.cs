@@ -21,14 +21,14 @@ namespace credirect_api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<StudentDetail>>> GetStudents()
         {
-            return await _context.StudentDetails.ToListAsync();
+            return await _context.StudentDetail.ToListAsync();
         }
 
         // GET: api/Student/5
         [HttpGet("{id}")]
         public async Task<ActionResult<StudentDetail>> GetStudent(int id)
         {
-            var student = await _context.StudentDetails.FindAsync(id);
+            var student = await _context.StudentDetail.FindAsync(id);
 
             if (student == null)
             {
@@ -42,7 +42,7 @@ namespace credirect_api.Controllers
         [HttpPost]
         public async Task<ActionResult<StudentDetail>> PostStudent(StudentDetail student)
         {
-            _context.StudentDetails.Add(student);
+            _context.StudentDetail.Add(student);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetStudent), new { id = student.Id }, student);
@@ -82,13 +82,13 @@ namespace credirect_api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteStudent(int id)
         {
-            var student = await _context.StudentDetails.FindAsync(id);
+            var student = await _context.StudentDetail.FindAsync(id);
             if (student == null)
             {
                 return NotFound();
             }
 
-            _context.StudentDetails.Remove(student);
+            _context.StudentDetail.Remove(student);
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -96,7 +96,7 @@ namespace credirect_api.Controllers
 
         private bool StudentExists(int id)
         {
-            return _context.StudentDetails.Any(e => e.Id == id);
+            return _context.StudentDetail.Any(e => e.Id == id);
         }
     }
 }
