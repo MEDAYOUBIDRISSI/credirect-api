@@ -75,4 +75,86 @@ public class CredirectController : ControllerBase
 
         return NoContent();
     }
+
+    /////////////////////////////////////////////////
+    ///
+    [HttpGet("getAllClient")]
+    public async Task<dynamic> GetAllClient()
+    {
+        var entity = await _context.Client.Select(t =>
+                                                new 
+                                                { 
+                                                    t.LastName,
+                                                    t.FirstName,
+                                                    t.Matricule
+                                                }
+                                                ).AsNoTracking().ToListAsync();
+        if (entity == null)
+        {
+            return NotFound();
+        }
+        return entity;
+    }
+
+    [HttpPost("addTier")]
+    public async Task<IActionResult> CreateOrUpdateTier([FromBody] Client entity)
+    {
+        if (entity == null)
+        {
+            return BadRequest("Client entity cannot be null.");
+        }
+
+        try
+        {
+            var existingClient = await _context.Client
+                .FirstOrDefaultAsync(x => x.ClientID == entity.ClientID);
+
+            if (existingClient != null)
+            {
+                // Update existing client
+                UpdateClient(existingClient, entity);
+            }
+            else
+            {
+                // Create new client
+                var newClient = new Client
+                {
+                    LastName = entity.LastName,
+                    FirstName = entity.FirstName,
+                    Matricule = entity.Matricule,
+                    BirthDate = entity.BirthDate,
+                    ClientTitleID = entity.ClientTitleID,
+                    Email = entity.Email,
+                    Nationality = entity.Nationality,
+                    IdentityID = entity.IdentityID
+                };
+
+                await _context.Client.AddAsync(newClient);
+                await _context.SaveChangesAsync();
+                return Ok(newClient.ClientID);
+            }
+
+            // Save changes for updates
+            await _context.SaveChangesAsync();
+            return Ok(existingClient.ClientID);
+        }
+        catch (Exception ex)
+        {
+            // Log exception (Assumes a logging mechanism is in place)
+            return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing your request.");
+        }
+    }
+
+    private void UpdateClient(Client existingClient, Client newClientData)
+    {
+        existingClient.LastName = newClientData.LastName;
+        existingClient.FirstName = newClientData.FirstName;
+        existingClient.Matricule = newClientData.Matricule;
+        existingClient.BirthDate = newClientData.BirthDate;
+        existingClient.ClientTitleID = newClientData.ClientTitleID;
+        existingClient.Email = newClientData.Email;
+        existingClient.Nationality = newClientData.Nationality;
+        existingClient.IdentityID = newClientData.IdentityID;
+    }
+
 }
