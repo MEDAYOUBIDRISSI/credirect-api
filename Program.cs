@@ -38,7 +38,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Add the context "CafeEraContext"
-builder.Services.AddDbContext<StudentContext>(options =>
+builder.Services.AddDbContext<CredirectContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
