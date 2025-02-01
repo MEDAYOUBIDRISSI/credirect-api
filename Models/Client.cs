@@ -41,7 +41,14 @@
         public decimal? SocialCapital { get; set; }
         public int? BusinessActivityID { get; set; }
         public BusinessActivity? BusinessActivity { get; set; }
-        public int? ManagerID { get; set; }
-        public ManagerInformation? Manager { get; set; }
+        public string? CIN { get; set; }
+        public string? ResidencePermit { get; set; }
+        public string? PassportNumber { get; set; }
+        public int? RoleID { get; set; }
+        public ClientRole? Role { get; set; }
+        public bool? is_individual { get; set; }
+        public bool? is_organisation { get; set; }
+        public int? OriginID { get; set; }
+        public ClientOrigin? Origin { get; set; }
     }
 }

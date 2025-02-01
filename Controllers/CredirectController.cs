@@ -7,9 +7,9 @@ using Microsoft.EntityFrameworkCore;
 [ApiController]
 public class CredirectController : ControllerBase
 {
-    private readonly StudentContext _context;
+    private readonly CredirectContext _context;
 
-    public CredirectController(StudentContext context)
+    public CredirectController(CredirectContext context)
     {
         _context = context;
     }
@@ -81,14 +81,7 @@ public class CredirectController : ControllerBase
     [HttpGet("getAllClient")]
     public async Task<dynamic> GetAllClient()
     {
-        var entity = await _context.Client.Select(t =>
-                                                new 
-                                                { 
-                                                    t.LastName,
-                                                    t.FirstName,
-                                                    t.Matricule
-                                                }
-                                                ).AsNoTracking().ToListAsync();
+        var entity = await _context.Client.Select(t => new { t.LastName, t.FirstName, t.Matricule } ).AsNoTracking().ToListAsync();
         if (entity == null)
         {
             return NotFound();
@@ -119,14 +112,32 @@ public class CredirectController : ControllerBase
                 // Create new client
                 var newClient = new Client
                 {
+                    Matricule = entity.Matricule,
+                    is_individual = entity.is_individual,
+                    is_organisation = entity.is_organisation,
+                    RoleID = entity.RoleID,
                     LastName = entity.LastName,
                     FirstName = entity.FirstName,
-                    Matricule = entity.Matricule,
                     BirthDate = entity.BirthDate,
-                    ClientTitleID = entity.ClientTitleID,
-                    Email = entity.Email,
+                    ClientTitleID = entity.ClientTitleID, //civilite
                     Nationality = entity.Nationality,
-                    IdentityID = entity.IdentityID
+                    Email = entity.Email,
+                    IdentityID = entity.IdentityID,
+                    CIN = entity.CIN,
+                    PassportNumber = entity.PassportNumber,
+                    ResidencePermit = entity.ResidencePermit,
+
+                    City = entity.City,
+                    CountryID = entity.CountryID,
+                    ResidenceCountry = entity.ResidenceCountry,
+                    MobilePhone = entity.MobilePhone,
+                    LandlinePhone = entity.LandlinePhone,
+                    WorkPhone = entity.WorkPhone,
+                    Address = entity.Address,
+
+                    ResidencyStatusID = entity.ResidencyStatusID,
+                    RequestedAmount = entity.RequestedAmount,
+                    
                 };
 
                 await _context.Client.AddAsync(newClient);

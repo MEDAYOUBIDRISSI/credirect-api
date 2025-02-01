@@ -3,9 +3,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace credirect_api.Data
 {
-    public class StudentContext : DbContext
+    public class CredirectContext : DbContext
     {
-        public StudentContext(DbContextOptions<StudentContext> options) : base(options) { }
+        public CredirectContext(DbContextOptions<CredirectContext> options) : base(options) { }
 
         public DbSet<StudentDetail> StudentDetail { get; set; }
         public DbSet<Client> Client { get; set; }
@@ -15,7 +15,8 @@ namespace credirect_api.Data
         public DbSet<BusinessActivity> BusinessActivity { get; set; }
         public DbSet<ClientTitle> ClientTitle { get; set; }
         public DbSet<ClientCountry> ClientCountry { get; set; }
-        public DbSet<ManagerInformation> ManagerInformation { get; set; }
+        public DbSet<ClientRole> ClientRole { get; set; }
+        public DbSet<ClientOrigin> ClientOrigin { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -40,15 +41,20 @@ namespace credirect_api.Data
                 .HasForeignKey(c => c.ResidenceCountryID);
 
             modelBuilder.Entity<Client>()
-                .HasOne(c => c.Manager)
+                .HasOne(c => c.Role)
                 .WithOne()
-                .HasForeignKey<Client>(c => c.ManagerID);
+                .HasForeignKey<Client>(c => c.RoleID);
 
-            modelBuilder.Entity<ClientIdentity>()
-                .HasKey(ci => ci.IdentityID);
+            modelBuilder.Entity<Client>()
+                .HasOne(c => c.Origin)
+                .WithOne()
+                .HasForeignKey<Client>(c => c.OriginID);
 
-            modelBuilder.Entity<ManagerInformation>()
-                .HasKey(m => m.ManagerID); // Explicitly set the primary key
+            //modelBuilder.Entity<ClientIdentity>()
+            //    .HasKey(ci => ci.IdentityID); 
+
+            //modelBuilder.Entity<ManagerInformation>()
+            //    .HasKey(m => m.ManagerID);
 
             // Add other relationships as needed.
         }

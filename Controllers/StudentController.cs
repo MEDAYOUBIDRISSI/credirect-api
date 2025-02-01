@@ -10,9 +10,9 @@ namespace credirect_api.Controllers
     [ApiController]
     public class StudentController : ControllerBase
     {
-        private readonly StudentContext _context;
+        private readonly CredirectContext _context;
 
-        public StudentController(StudentContext context)
+        public StudentController(CredirectContext context)
         {
             _context = context;
         }
