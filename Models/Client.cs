@@ -2,7 +2,7 @@
 {
     public class Client
     {
-        public int ClientID { get; set; }
+        public int? ClientID { get; set; }
         public bool? VIP { get; set; }
         public string? Matricule { get; set; }
         public string? LastName { get; set; }
@@ -13,6 +13,8 @@
         public string? Nationality { get; set; }
         public int? IdentityID { get; set; }
         public ClientIdentity? ClientIdentity { get; set; }
+        public int? LegalFormID { get; set; }
+        public ClientLegalForm? ClientLegalForm { get; set; }
         public string? Address { get; set; }
         public string? City { get; set; }
         public int? CountryID { get; set; }
@@ -31,7 +33,7 @@
         public bool? IsTenant { get; set; }
         public decimal? RequestedAmount { get; set; }
         public string? CompanyName { get; set; }
-        public string? LegalForm { get; set; }
+        //public string? LegalForm { get; set; }
         public DateTime? CreationDate { get; set; }
         public string? RegistrationNumber { get; set; }
         public string? CompanyAddress { get; set; }
@@ -50,5 +52,7 @@
         public bool? is_organisation { get; set; }
         public int? OriginID { get; set; }
         public ClientOrigin? Origin { get; set; }
+        public string? OriginDetails { get; set; }
+        public ICollection<ClientManager>? ClientManagers { get; set; } = new List<ClientManager>();
     }
 }

@@ -2,7 +2,7 @@
 {
     public class ResidencyStatus
     {
-        public int ResidencyStatusID { get; set; }
-        public string ResidencyStatusLabel { get; set; }
+        public int? ResidencyStatusID { get; set; }
+        public string? ResidencyStatusLabel { get; set; }
     }
 }

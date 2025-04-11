@@ -2,7 +2,7 @@
 {
     public class ClientCountry
     {
-        public int ClientCountryID { get; set; }
-        public string ClientCountryLabel { get; set; }
+        public int? ClientCountryID { get; set; }
+        public string? ClientCountryLabel { get; set; }
     }
 }

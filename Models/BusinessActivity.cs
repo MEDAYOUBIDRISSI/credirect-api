@@ -2,7 +2,7 @@
 {
     public class BusinessActivity
     {
-        public int BusinessActivityID { get; set; }
-        public string BusinessActivityLabel { get; set; }
+        public int? BusinessActivityID { get; set; }
+        public string? BusinessActivityLabel { get; set; }
     }
 }

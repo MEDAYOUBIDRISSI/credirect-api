@@ -10,6 +10,7 @@ namespace credirect_api.Data
         public DbSet<StudentDetail> StudentDetail { get; set; }
         public DbSet<Client> Client { get; set; }
         public DbSet<ClientIdentity> ClientIdentity { get; set; }
+        public DbSet<ClientLegalForm> ClientLegalForm { get; set; }
         public DbSet<MaritalStatus> MaritalStatus { get; set; }
         public DbSet<ResidencyStatus> ResidencyStatus { get; set; }
         public DbSet<BusinessActivity> BusinessActivity { get; set; }
@@ -17,6 +18,8 @@ namespace credirect_api.Data
         public DbSet<ClientCountry> ClientCountry { get; set; }
         public DbSet<ClientRole> ClientRole { get; set; }
         public DbSet<ClientOrigin> ClientOrigin { get; set; }
+        public DbSet<ClientManager> ClientManager { get; set; }
+        public DbSet<ManagerInformation> ManagerInformation { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -29,6 +32,11 @@ namespace credirect_api.Data
                 .HasOne(c => c.ClientIdentity)
                 .WithMany()
                 .HasForeignKey(c => c.IdentityID);
+
+            modelBuilder.Entity<Client>()
+                .HasOne(c => c.ClientLegalForm)
+                .WithMany()
+                .HasForeignKey(c => c.LegalFormID);
 
             modelBuilder.Entity<Client>()
                 .HasOne(c => c.Country)
@@ -50,13 +58,61 @@ namespace credirect_api.Data
                 .WithOne()
                 .HasForeignKey<Client>(c => c.OriginID);
 
-            //modelBuilder.Entity<ClientIdentity>()
-            //    .HasKey(ci => ci.IdentityID); 
+            // Configure ClientManager relationships
+            modelBuilder.Entity<ClientManager>()
+                .HasKey(cm => cm.ClientManagerID);
 
-            //modelBuilder.Entity<ManagerInformation>()
-            //    .HasKey(m => m.ManagerID);
+            modelBuilder.Entity<ClientManager>()
+                .HasOne(cm => cm.Client)
+                .WithMany(c => c.ClientManagers)
+                .HasForeignKey(cm => cm.ClientID);
 
-            // Add other relationships as needed.
+            modelBuilder.Entity<ClientManager>()
+                .HasOne(cm => cm.ManagerInformation)
+                .WithMany(m => m.ClientManagers)
+                .HasForeignKey(cm => cm.ManagerID);
+
+            // Configure ManagerInformation relationships
+            modelBuilder.Entity<ManagerInformation>()
+                .HasOne(m => m.ManagerTitle)
+                .WithMany()
+                .HasForeignKey(m => m.ManagerTitleID);
+
+            modelBuilder.Entity<ManagerInformation>()
+                .HasOne(m => m.Identity)
+                .WithMany()
+                .HasForeignKey(m => m.Id_Identity);
+
+            modelBuilder.Entity<ManagerInformation>()
+                .HasOne(m => m.ManagerCountry)
+                .WithMany()
+                .HasForeignKey(m => m.ManagerCountryID);
+
+            modelBuilder.Entity<ManagerInformation>()
+                .HasOne(m => m.ManagerResidenceCountry)
+                .WithMany()
+                .HasForeignKey(m => m.ManagerResidenceCountryID);
+
+            modelBuilder.Entity<ManagerInformation>()
+                .HasOne(m => m.ManagerMaritalStatus)
+                .WithMany()
+                .HasForeignKey(m => m.Id_ManagerMaritalStatus);
+
+            modelBuilder.Entity<ClientIdentity>()
+                .HasKey(c => c.IdentityID);
+
+            modelBuilder.Entity<ClientLegalForm>()
+                .HasKey(c => c.LegalFormID);
+
+            modelBuilder.Entity<ClientOrigin>()
+                .HasKey(c => c.OriginID);
+
+            modelBuilder.Entity<ClientRole>()
+                .HasKey(c => c.RoleID);
+
+            modelBuilder.Entity<ManagerInformation>()
+                .HasKey(m => m.ManagerID);
+
         }
     }
 }

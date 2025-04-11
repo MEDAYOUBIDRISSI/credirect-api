@@ -2,7 +2,7 @@
 {
     public class MaritalStatus
     {
-        public int MaritalStatusID { get; set; }
-        public string MaritalStatusLabel { get; set; }
+        public int? MaritalStatusID { get; set; }
+        public string? MaritalStatusLabel { get; set; }
     }
 }
