@@ -1689,5 +1689,41 @@ public class CredirectController : ControllerBase
         }
     }
 
+    [HttpDelete("deleteClient/{id}")]
+    public async Task<IActionResult> DeleteClient(int id)
+    {
+        try
+        {
+            var client = await _context.Client.FindAsync(id);
+            if (client == null)
+            {
+                return NotFound(new { success = false, message = "Client not found." });
+            }
+
+            // Manually delete related records (if needed)
+            var managers = await _context.ClientManager
+                .Where(cm => cm.ClientID == id)
+                .Include(cm => cm.ManagerInformation)
+                .ToListAsync();
+
+            foreach (var manager in managers)
+            {
+                if (manager.ManagerInformation != null)
+                {
+                    _context.ManagerInformation.Remove(manager.ManagerInformation);
+                }
+                _context.ClientManager.Remove(manager);
+            }
+
+            _context.Client.Remove(client);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true, message = "Client deleted successfully." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
 
 }
