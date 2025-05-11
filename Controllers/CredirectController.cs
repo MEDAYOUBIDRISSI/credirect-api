@@ -1278,6 +1278,7 @@ public class CredirectController : ControllerBase
                 derogationSouhaitee = lign?.DerogationSouhaite,
                 assurance = lign?.AssuranceDeczsInvalidite,
                 commentCredit = lign?.CommentCredit,
+                honorairesFactures = lign?.honorairesFactures,
                 biens = properties.Select(p => new
                 {
                     nature = p.NaturePropertyID,
@@ -1365,6 +1366,9 @@ public class CredirectController : ControllerBase
 
             if (planElement.TryGetProperty("assurance", out JsonElement assEl) && assEl.ValueKind == JsonValueKind.Number)
                 lign.AssuranceDeczsInvalidite = assEl.GetInt32();
+
+            if (planElement.TryGetProperty("honorairesFactures", out JsonElement ore) && ore.ValueKind == JsonValueKind.Number)
+                lign.honorairesFactures = ore.GetDecimal();
 
             lign.CommentCredit = planElement.TryGetProperty("commentCredit", out JsonElement toto) && toto.ValueKind == JsonValueKind.String ? toto.GetString() : null;
             
@@ -1505,6 +1509,107 @@ public class CredirectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
         }
     }
+
+    [HttpPost("getDepot")]
+    public async Task<IActionResult> GetDepot(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+            int creditID = 0;
+
+            if (json.TryGetProperty("dossierID", out JsonElement creditElement) && creditElement.ValueKind == JsonValueKind.String)
+            {
+                int.TryParse(creditElement.GetString(), out creditID);
+            }
+
+            if (creditID == 0)
+                return BadRequest("dossierID est requis.");
+
+            var depots = await _context.CreditDepot
+                .Where(d => d.id_credit == creditID)
+                .ToListAsync();
+
+            var result = depots.Select(d => new
+            {
+                banque = d.id_agency_bank,
+                interlocuteur = d.interlocutor,
+                agence = d.agence,
+                dateEnvoi = d.date_sent
+            }).ToList();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                data = result
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("saveDepot")]
+    public async Task<IActionResult> SaveDepot(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int creditID = 0;
+            if (json.TryGetProperty("dossierID", out JsonElement creditElement) && creditElement.ValueKind == JsonValueKind.String)
+            {
+                int.TryParse(creditElement.GetString(), out creditID);
+            }
+
+            if (!json.TryGetProperty("depots", out JsonElement depotsElement) || depotsElement.ValueKind != JsonValueKind.Array)
+            {
+                return BadRequest("Liste des dépôts manquante.");
+            }
+
+            // Delete existing deposits
+            var oldDepots = await _context.CreditDepot
+                .Where(d => d.id_credit == creditID)
+                .ToListAsync();
+            _context.CreditDepot.RemoveRange(oldDepots);
+
+            // Add new deposits
+            foreach (var depot in depotsElement.EnumerateArray())
+            {
+                var newDepot = new CreditDepot
+                {
+                    id_credit = creditID,
+                    id_agency_bank = depot.TryGetProperty("banque", out var bankEl) && bankEl.ValueKind == JsonValueKind.Number ? bankEl.GetInt32() : 0,
+                    interlocutor = depot.TryGetProperty("interlocuteur", out var intEl) && intEl.ValueKind == JsonValueKind.String ? intEl.GetString() : null,
+                    agence = depot.TryGetProperty("agence", out var agEl) && agEl.ValueKind == JsonValueKind.String ? agEl.GetString() : null,
+                    date_sent = depot.TryGetProperty("dateEnvoi", out var dateEl) && dateEl.ValueKind == JsonValueKind.String
+                                ? DateTime.Parse(dateEl.GetString()!)
+                                : (DateTime?)null,
+                    created_at = DateTime.Now // optional
+                };
+
+                _context.CreditDepot.Add(newDepot);
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                message = "Dépôts enregistrés avec succès."
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
 
 
 }

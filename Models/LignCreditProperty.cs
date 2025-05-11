@@ -19,6 +19,7 @@
         public bool? DerogationSouhaite { get; set; }
         public int? AssuranceDeczsInvalidite { get; set; }
         public string? CommentCredit { get; set; }
+        public decimal? honorairesFactures { get; set; }
 
         public Credit? Credit { get; set; }
         public ObjectCredit? ObjectCredit { get; set; }
