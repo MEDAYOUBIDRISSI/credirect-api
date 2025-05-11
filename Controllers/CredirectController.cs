@@ -328,7 +328,7 @@ public class CredirectController : ControllerBase
         {
             // Update existing ManagerInformation
             existingManagerInfo.ManagerTitleID = managerInformation.ManagerTitleID;
-            existingManagerInfo.ManagerLastName = managerInformation.ManagerLastName;
+            existingManagerInfo.ManagerLastName = managerInformation.ManagerLastName ;
             existingManagerInfo.ManagerFirstName = managerInformation.ManagerFirstName;
             existingManagerInfo.ManagerBirthDate = managerInformation.ManagerBirthDate;
             existingManagerInfo.ManagerNationality = managerInformation.ManagerNationality;
