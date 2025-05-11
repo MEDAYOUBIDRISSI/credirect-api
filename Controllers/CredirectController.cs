@@ -969,6 +969,18 @@ public class CredirectController : ControllerBase
 
         if (tierID != null)
         {
+            // Get pensions
+            var pensions = await _context.Pensionnaire
+                .Where(p => p.ClientID == tierID)
+                .Select(p => new
+                {
+                    p.Id,
+                    p.NaturePension,
+                    p.OrganismePension,
+                    p.TypePension,
+                    p.Montant
+                })
+                .ToListAsync();
             // Générer matricule
             var Tier = await _context.Client.Where(b => b.ClientID == tierID).Select(s => new
             {
@@ -998,7 +1010,33 @@ public class CredirectController : ControllerBase
                 statutOccupation = "Locataire",
                 provenanceClient = "Agence immobilière",
                 origin = s.Origin.OriginLabel,
-                montantSollicite = "500,000 MAD"
+                montantSollicite = "500,000 MAD",
+                // New fields
+                Profession = s.Profession,
+                Nature_activity = s.Nature_activity,
+                IfOrTp = s.IfOrTp,
+                Adress_activity = s.Adress_activity,
+                Honoraires = s.Honoraires,
+                Date_debut_exercice = s.Date_debut_exercice,
+                Fonction = s.Fonction,
+                Employeur = s.Employeur,
+                Date_Embauche = s.Date_Embauche,
+                Salaire = s.Salaire,
+                NRC = s.NRC,
+                Date_Creation_RC = s.Date_Creation_RC,
+                Revenu = s.Revenu,
+                Denomination = s.Denomination,
+                Date_Creation_Company = s.Date_Creation_Company,
+                ActivityCompany = s.ActivityCompany,
+                Capital_Social = s.Capital_Social,
+                ResultatYearN = s.ResultatYearN,
+                ChiffreAffaireYearN = s.ChiffreAffaireYearN,
+                ResultatYearN_1 = s.ResultatYearN_1,
+                ChiffreAffaireYearN_1 = s.ChiffreAffaireYearN_1,
+                PartsParticipationSociete = s.PartsParticipationSociete,
+                Nature_Bail = s.Nature_Bail,
+                Rent = s.Rent,
+                pensions = pensions
 
             }).ToListAsync();
 
@@ -1044,43 +1082,612 @@ public class CredirectController : ControllerBase
         });
     }
 
-    [HttpDelete("deleteClient/{id}")]
-    public async Task<IActionResult> DeleteClient(int id)
+    [HttpPost("saveTierInfoProf")]
+    public async Task<IActionResult> saveTierInfoProf(dynamic entity)
     {
+        JsonElement json = (JsonElement)entity;
+
+        int tierID = 0;
+        //if (entity == null)
+        //{
+        //    return BadRequest("Client entity cannot be null.");
+        //}
+
+        if (json.TryGetProperty("tierID", out JsonElement folderElement) && folderElement.ValueKind == JsonValueKind.String)
+        {
+            int.TryParse(folderElement.GetString(), out tierID);
+        }
+
         try
         {
-            var client = await _context.Client.FindAsync(id);
-            if (client == null)
-            {
-                return NotFound(new { success = false, message = "Client not found." });
-            }
+            var existingClient = await _context.Client.Where(b => b.ClientID == tierID).FirstOrDefaultAsync();
 
-            // Manually delete related records (if needed)
-            var managers = await _context.ClientManager
-                .Where(cm => cm.ClientID == id)
-                .Include(cm => cm.ManagerInformation)
-                .ToListAsync();
-
-            foreach (var manager in managers)
+            if (existingClient != null)
             {
-                if (manager.ManagerInformation != null)
+                // Update existing client
+                // Deserialize the user part
+                var userJson = json.GetProperty("user").ToString();
+                var user = JsonSerializer.Deserialize<Client>(userJson);
+                // Update based on profession
+                int profession = json.GetProperty("Profession").GetInt32();
+                existingClient.Profession = profession;
+                switch (profession)
                 {
-                    _context.ManagerInformation.Remove(manager.ManagerInformation);
+                    case 1: // Salarié
+                        existingClient.Fonction = user.Fonction;
+                        existingClient.Employeur = user.Employeur;
+                        existingClient.Date_Embauche = user.Date_Embauche;
+                        existingClient.Salaire = user.Salaire;
+                        break;
+
+                    case 2: // Commerçant personne physique
+                        existingClient.NRC = user.NRC;
+                        existingClient.Date_Creation_RC = user.Date_Creation_RC;
+                        existingClient.Nature_activity = user.Nature_activity;
+                        existingClient.Adress_activity = user.Adress_activity;
+                        existingClient.Revenu = user.Revenu;
+                        break;
+
+                    case 3: // Profession libérale
+                        existingClient.Nature_activity = user.Nature_activity;
+                        existingClient.IfOrTp = user.IfOrTp;
+                        existingClient.Adress_activity = user.Adress_activity;
+                        existingClient.Date_debut_exercice = user.Date_debut_exercice;
+                        existingClient.Honoraires = user.Honoraires;
+                        break;
+
+                    case 4: // Gérant de société
+                        existingClient.Denomination = user.Denomination;
+                        existingClient.NRC = user.NRC;
+                        existingClient.Date_Creation_Company = user.Date_Creation_Company;
+                        existingClient.Capital_Social = user.Capital_Social;
+                        existingClient.ActivityCompany = user.ActivityCompany;
+                        existingClient.Adress_activity = user.Adress_activity;
+                        existingClient.ResultatYearN = user.ResultatYearN;
+                        existingClient.ResultatYearN_1 = user.ResultatYearN_1;
+                        existingClient.ChiffreAffaireYearN = user.ChiffreAffaireYearN;
+                        existingClient.ChiffreAffaireYearN_1 = user.ChiffreAffaireYearN_1;
+                        existingClient.PartsParticipationSociete = user.PartsParticipationSociete;
+                        existingClient.Revenu = user.Revenu;
+                        break;
+
+                    case 5: // Retraité ou pensionnaire (if needed)
+                        if (json.TryGetProperty("user", out JsonElement userElement) && userElement.TryGetProperty("Pension", out JsonElement pensionList))
+                        {
+                            var pensionnaires = JsonSerializer.Deserialize<List<Pensionnaire>>(pensionList.ToString());
+
+                            // Get existing pensions from DB
+                            var existingPensions = await _context.Pensionnaire
+                                .Where(p => p.ClientID == tierID)
+                                .ToListAsync();
+
+                            // Update or add new pensions
+                            foreach (var pension in pensionnaires)
+                            {
+                                if (pension.Id > 0)
+                                {
+                                    // Update existing
+                                    var existing = existingPensions.FirstOrDefault(p => p.Id == pension.Id);
+                                    if (existing != null)
+                                    {
+                                        existing.NaturePension = pension.NaturePension;
+                                        existing.OrganismePension = pension.OrganismePension;
+                                        existing.TypePension = pension.TypePension;
+                                        existing.Montant = pension.Montant;
+                                    }
+                                }
+                                else
+                                {
+                                    // New pension
+                                    pension.ClientID = tierID;
+                                    _context.Pensionnaire.Add(pension);
+                                }
+                            }
+
+                            // Delete pensions not in the updated list
+                            var updatedIds = pensionnaires.Where(p => p.Id > 0).Select(p => p.Id).ToList();
+                            var toDelete = existingPensions.Where(p => !updatedIds.Contains(p.Id)).ToList();
+                            _context.Pensionnaire.RemoveRange(toDelete);
+                        }
+                        break;
+
+                    case 6: // Profession libérale
+                        existingClient.Nature_Bail = user.Nature_Bail;
+                        existingClient.Rent = user.Rent;
+                        break;
                 }
-                _context.ClientManager.Remove(manager);
+
+                // Save changes
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    status_code = 200,
+                    data = existingClient
+                });
+
             }
-
-            _context.Client.Remove(client);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { success = true, message = "Client deleted successfully." });
+            else
+            {
+                return Ok(new
+                {
+                    success = true,
+                    status_code = 401,
+                    message = "not found."
+                });
+            }
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { success = false, message = ex.Message });
+            // Log the exception details
+            Console.WriteLine($"Exception: {ex.Message}");
+            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"An error occurred: {ex.Message}");
         }
     }
 
+    [HttpPost("getInfosBank")]
+    public async Task<IActionResult> GetInfosBank(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int clientID = 0;
+            if (json.TryGetProperty("tierID", out JsonElement clientElement) && clientElement.ValueKind == JsonValueKind.String)
+            {
+                int.TryParse(clientElement.GetString(), out clientID);
+            }
+
+            if (clientID == 0)
+                return BadRequest("clientID est requis.");
+
+            var infosBankList = await _context.InfosBank
+                .Where(i => i.ClientID == clientID)
+                .ToListAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                data = infosBankList
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("saveInfosBank")]
+    public async Task<IActionResult> saveInfosBank(dynamic entity)
+    {
+        JsonElement json = (JsonElement)entity;
+
+        int clientID = 0;
+        if (json.TryGetProperty("tierID", out JsonElement clientElement) && clientElement.ValueKind == JsonValueKind.String)
+        {
+            int.TryParse(clientElement.GetString(), out clientID);
+        }
+
+        if (clientID == 0)
+            return BadRequest("ClientID manquant ou invalide.");
+
+        try
+        {
+            // Deserialize infosBank list
+            if (json.TryGetProperty("infoBank", out JsonElement infosElement))
+            {
+                var infosBankList = JsonSerializer.Deserialize<List<InfosBank>>(infosElement.ToString());
+
+                // Get existing records
+                var existingInfos = await _context.InfosBank
+                    .Where(i => i.ClientID == clientID)
+                    .ToListAsync();
+
+                // Update or add
+                foreach (var info in infosBankList)
+                {
+                    if (info.InfoBankID > 0)
+                    {
+                        var existing = existingInfos.FirstOrDefault(x => x.InfoBankID == info.InfoBankID);
+                        if (existing != null)
+                        {
+                            existing.AgencyBankID = info.AgencyBankID;
+                            existing.AgencyName = info.AgencyName;
+                            existing.Balance = info.Balance;
+                            existing.CumulativeCreditMovement = info.CumulativeCreditMovement;
+                            existing.IsPrincipal = info.IsPrincipal;
+                        }
+                    }
+                    else
+                    {
+                        info.ClientID = clientID;
+                        _context.InfosBank.Add(info);
+                    }
+                }
+
+                // Delete removed rows
+                var updatedIds = infosBankList.Where(x => x.InfoBankID > 0).Select(x => x.InfoBankID).ToList();
+                var toDelete = existingInfos.Where(x => !updatedIds.Contains(x.InfoBankID)).ToList();
+                _context.InfosBank.RemoveRange(toDelete);
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    status_code = 200,
+                    message = "Mise à jour effectuée avec succès"
+                });
+            }
+
+            return BadRequest("Liste infosBank manquante.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("getEngagement")]
+    public async Task<IActionResult> GetEngagement(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+            int clientID = 0;
+
+            if (json.TryGetProperty("tierID", out JsonElement clientElement) && clientElement.ValueKind == JsonValueKind.String)
+            {
+                int.TryParse(clientElement.GetString(), out clientID);
+            }
+
+            if (clientID == 0)
+                return BadRequest("ClientID est requis.");
+
+            var engagements = await _context.BankCommitmentsCharges
+                .Where(e => e.ClientID == clientID)
+                .ToListAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                data = engagements
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("saveEngagement")]
+    public async Task<IActionResult> SaveEngagement(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int clientID = 0;
+            if (json.TryGetProperty("tierID", out JsonElement clientElement) && clientElement.ValueKind == JsonValueKind.String)
+            {
+                int.TryParse(clientElement.GetString(), out clientID);
+            }
+
+            if (!json.TryGetProperty("engagement", out JsonElement engagementElement))
+            {
+                return BadRequest("Engagement manquant.");
+            }
+
+            var engagement = JsonSerializer.Deserialize<BankCommitmentsCharges>(engagementElement.ToString());
+
+            if (clientID == 0 || engagement == null)
+                return BadRequest("ClientID ou engagement invalide.");
+
+            // Check for existing engagement
+            var existing = await _context.BankCommitmentsCharges
+                .FirstOrDefaultAsync(e => e.ClientID == clientID);
+
+            if (existing != null)
+            {
+                // Update existing
+                existing.NatureCommitmentID = engagement.NatureCommitmentID;
+                existing.AgencyBankID = engagement.AgencyBankID;
+                existing.OtherAgency = engagement.OtherAgency;
+                existing.Maturity = engagement.Maturity;
+                existing.Outstanding = engagement.Outstanding;
+                existing.RepayableEarly = engagement.RepayableEarly;
+            }
+            else
+            {
+                // New engagement
+                engagement.ClientID = clientID;
+                _context.BankCommitmentsCharges.Add(engagement);
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                message = "Engagement enregistré avec succès."
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("getPlanFinancement")]
+    public async Task<IActionResult> GetPlanFinancement(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+            int creditID = 0;
+
+            if (json.TryGetProperty("dossierID", out JsonElement creditElement) && creditElement.ValueKind == JsonValueKind.String)
+            {
+                int.TryParse(creditElement.GetString(), out creditID);
+            }
+
+            if (creditID == 0)
+                return BadRequest("dossierID est requis.");
+
+            var lign = await _context.LignCreditProperty
+                .FirstOrDefaultAsync(x => x.CreditID == creditID);
+
+            var properties = await _context.Property
+                .Where(p => p.CreditID == creditID)
+                .ToListAsync();
+
+            var result = new
+            {
+                objetCredit = lign?.ObjectCreditID,
+                montantCredit = lign?.MontantCredit,
+                dureeCredit = lign?.DureeCredit,
+                frequenceRemboursement = lign?.FrequenceRemboursement,
+                dureeFranchise = lign?.DureeFranchise,
+                tauxCredit = lign?.TauxCredit,
+                derogationSouhaitee = lign?.DerogationSouhaite,
+                assurance = lign?.AssuranceDeczsInvalidite,
+                commentCredit = lign?.CommentCredit,
+                biens = properties.Select(p => new
+                {
+                    nature = p.NaturePropertyID,
+                    affectation = p.AssignmentPropertyID,
+                    usage = p.UsePropertyID,
+                    etat = p.ConditionPropertyID,
+                    adresse = p.Adress,
+                    propertyArea = p.PropertyArea,
+                    titreFoncier = p.LandTitle,
+                    prixVente = p.SalePriceProperty,
+                    valeurReelle = p.RealValueProperty,
+                    montantTravaux = p.AmountWork
+                }).ToList()
+            };
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                data = new[] { result }
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("savePlanFinancement")]
+    public async Task<IActionResult> SavePlanFinancement(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int creditID = 0;
+            if (json.TryGetProperty("dossierID", out JsonElement creditElement) && creditElement.ValueKind == JsonValueKind.String)
+            {
+                int.TryParse(creditElement.GetString(), out creditID);
+            }
+
+            if (!json.TryGetProperty("planFinancement", out JsonElement planElement))
+                return BadRequest("planFinancement manquant.");
+
+            if (creditID == 0)
+                return BadRequest("dossierID est requis.");
+
+            // Get objetCredit
+            int? objetCreditID = null;
+            if (planElement.TryGetProperty("objetCredit", out JsonElement objCreditEl) && objCreditEl.ValueKind == JsonValueKind.Number)
+            {
+                objetCreditID = objCreditEl.GetInt32();
+            }
+
+            // Save or update LignCreditProperty
+            var lign = await _context.LignCreditProperty
+                .FirstOrDefaultAsync(x => x.CreditID == creditID);
+
+            if (lign == null)
+            {
+                lign = new LignCreditProperty { CreditID = creditID };
+                _context.LignCreditProperty.Add(lign);
+            }
+
+            lign.ObjectCreditID = objetCreditID;
+
+            if (planElement.TryGetProperty("montantCredit", out JsonElement mcEl) && mcEl.ValueKind == JsonValueKind.Number)
+                lign.MontantCredit = mcEl.GetDecimal();
+
+            if (planElement.TryGetProperty("dureeCredit", out JsonElement dcEl) && dcEl.ValueKind == JsonValueKind.Number)
+                lign.DureeCredit = dcEl.GetDecimal();
+
+            if (planElement.TryGetProperty("frequenceRemboursement", out JsonElement frEl) && frEl.ValueKind == JsonValueKind.Number)
+                lign.FrequenceRemboursement = frEl.GetInt32();
+
+            if (planElement.TryGetProperty("dureeFranchise", out JsonElement dfEl) && dfEl.ValueKind == JsonValueKind.Number)
+                lign.DureeFranchise = dfEl.GetDecimal();
+
+            if (planElement.TryGetProperty("tauxCredit", out JsonElement tcEl) && tcEl.ValueKind == JsonValueKind.Number)
+                lign.TauxCredit = tcEl.GetDecimal();
+
+            if (planElement.TryGetProperty("derogationSouhaitee", out JsonElement dsEl) && dsEl.ValueKind == JsonValueKind.True || dsEl.ValueKind == JsonValueKind.False)
+                lign.DerogationSouhaite = dsEl.GetBoolean();
+
+            if (planElement.TryGetProperty("assurance", out JsonElement assEl) && assEl.ValueKind == JsonValueKind.Number)
+                lign.AssuranceDeczsInvalidite = assEl.GetInt32();
+
+            lign.CommentCredit = planElement.TryGetProperty("commentCredit", out JsonElement toto) && toto.ValueKind == JsonValueKind.String ? toto.GetString() : null;
+            
+            // Remove old Properties
+            var oldProps = await _context.Property
+                .Where(p => p.CreditID == creditID)
+                .ToListAsync();
+            _context.Property.RemoveRange(oldProps);
+
+            // Insert new properties
+            if (planElement.TryGetProperty("biens", out JsonElement biensElement) && biensElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (JsonElement bien in biensElement.EnumerateArray())
+                {
+                    var newProp = new Property
+                    {
+                        CreditID = creditID,
+                        NaturePropertyID = bien.TryGetProperty("nature", out JsonElement natEl) && natEl.ValueKind == JsonValueKind.Number ? natEl.GetInt32() : (int?)null,
+                        AssignmentPropertyID = bien.TryGetProperty("affectation", out JsonElement affEl) && affEl.ValueKind == JsonValueKind.Number ? affEl.GetInt32() : (int?)null,
+                        UsePropertyID = bien.TryGetProperty("usage", out JsonElement useEl) && useEl.ValueKind == JsonValueKind.Number ? useEl.GetInt32() : (int?)null,
+                        ConditionPropertyID = bien.TryGetProperty("etat", out JsonElement etatEl) && etatEl.ValueKind == JsonValueKind.Number ? etatEl.GetInt32() : (int?)null,
+                        Adress = bien.TryGetProperty("adresse", out JsonElement adrEl) && adrEl.ValueKind == JsonValueKind.String ? adrEl.GetString() : null,
+                        PropertyArea = bien.TryGetProperty("propertyArea", out JsonElement supEl) && supEl.ValueKind == JsonValueKind.String ? supEl.GetString() : null,
+                        LandTitle = bien.TryGetProperty("titreFoncier", out JsonElement tfEl) && tfEl.ValueKind == JsonValueKind.String ? tfEl.GetString() : null,
+                        SalePriceProperty = bien.TryGetProperty("prixVente", out JsonElement pvEl) && pvEl.ValueKind == JsonValueKind.Number ? pvEl.GetDecimal() : (decimal?)null,
+                        RealValueProperty = bien.TryGetProperty("valeurReelle", out JsonElement vrEl) && vrEl.ValueKind == JsonValueKind.Number ? vrEl.GetDecimal() : (decimal?)null,
+                        AmountWork = bien.TryGetProperty("montantTravaux", out JsonElement mtEl) && mtEl.ValueKind == JsonValueKind.Number ? mtEl.GetDecimal() : (decimal?)null
+                    };
+
+                    _context.Property.Add(newProp);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                message = "Plan de financement enregistré avec succès."
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("getGarantie")]
+    public async Task<IActionResult> GetGarantie(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+            int creditID = 0;
+
+            if (json.TryGetProperty("dossierID", out JsonElement creditElement) && creditElement.ValueKind == JsonValueKind.String)
+            {
+                int.TryParse(creditElement.GetString(), out creditID);
+            }
+
+            if (creditID == 0)
+                return BadRequest("dossierID est requis.");
+
+            var garanties = await _context.GarantieCredit
+                .Where(g => g.CreditID == creditID)
+                .ToListAsync();
+
+            var result = garanties.Select(g => new
+            {
+                id = g.GarantieCreditID,
+                name = g.Label
+            }).ToList();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                data = result
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("saveGarantie")]
+    public async Task<IActionResult> SaveGarantie(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int creditID = 0;
+            if (json.TryGetProperty("dossierID", out JsonElement creditElement) && creditElement.ValueKind == JsonValueKind.String)
+            {
+                int.TryParse(creditElement.GetString(), out creditID);
+            }
+
+            if (!json.TryGetProperty("canauxVentes", out JsonElement garantiesElement) || garantiesElement.ValueKind != JsonValueKind.Array)
+                return BadRequest("canauxVentes manquants.");
+
+            // Remove existing garanties
+            var oldGaranties = await _context.GarantieCredit
+                .Where(g => g.CreditID == creditID)
+                .ToListAsync();
+            _context.GarantieCredit.RemoveRange(oldGaranties);
+
+            // Add new ones
+            foreach (var garantie in garantiesElement.EnumerateArray())
+            {
+                if (garantie.TryGetProperty("name", out JsonElement nameEl) && nameEl.ValueKind == JsonValueKind.String)
+                {
+                    var g = new GarantieCredit
+                    {
+                        CreditID = creditID,
+                        Label = nameEl.GetString()
+                    };
+                    _context.GarantieCredit.Add(g);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                message = "Garanties enregistrées avec succès."
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
 
 
 }

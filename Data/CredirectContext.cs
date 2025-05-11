@@ -20,26 +20,28 @@ namespace credirect_api.Data
 
         // New DbSet properties
         public DbSet<InfoProfessional> InfoProfessionals { get; set; }
-        public DbSet<AgencyBank> AgencyBanks { get; set; }
-        public DbSet<InfosBank> InfosBanks { get; set; }
+        public DbSet<AgencyBank> AgencyBank { get; set; }
+        public DbSet<InfosBank> InfosBank { get; set; }
         public DbSet<NatureCommitment> NatureCommitments { get; set; }
         public DbSet<BankCommitmentsCharges> BankCommitmentsCharges { get; set; }
         public DbSet<CreditType> CreditType { get; set; }
         public DbSet<Credit> Credit { get; set; }
         public DbSet<LignCreditClient> LignCreditClient { get; set; }
-        public DbSet<ObjectCredit> ObjectCredits { get; set; }
-        public DbSet<NatureProperty> NatureProperties { get; set; }
-        public DbSet<AssignmentProperty> AssignmentProperties { get; set; }
-        public DbSet<UseProperty> UseProperties { get; set; }
-        public DbSet<ConditionProperty> ConditionProperties { get; set; }
-        public DbSet<Property> Properties { get; set; }
-        public DbSet<LignCreditProperty> LignCreditProperties { get; set; }
+        public DbSet<ObjectCredit> ObjectCredit { get; set; }
+        public DbSet<NatureProperty> NatureProperty { get; set; }
+        public DbSet<AssignmentProperty> AssignmentProperty { get; set; }
+        public DbSet<UseProperty> UseProperty { get; set; }
+        public DbSet<ConditionProperty> ConditionProperty { get; set; }
+        public DbSet<Property> Property { get; set; }
+        public DbSet<LignCreditProperty> LignCreditProperty { get; set; }
 
         public DbSet<ClientLegalForm> ClientLegalForm { get; set; }
         public DbSet<ClientManager> ClientManager { get; set; }
         public DbSet<ManagerInformation> ManagerInformation { get; set; }
         public DbSet<CreditDepot> CreditDepot { get; set; }
         public DbSet<CreditStatus> CreditStatus { get; set; }
+        public DbSet<Pensionnaire> Pensionnaire { get; set; }
+        public DbSet<GarantieCredit> GarantieCredit { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -228,6 +230,11 @@ namespace credirect_api.Data
                 .WithMany()
                 .HasForeignKey(p => p.ConditionPropertyID);
 
+            modelBuilder.Entity<Property>()
+                .HasOne(p => p.Credit)
+                .WithMany()
+                .HasForeignKey(p => p.CreditID);
+
             modelBuilder.Entity<CreditDepot>()
                 .HasOne(l => l.Credit)
                 .WithMany()
@@ -247,6 +254,16 @@ namespace credirect_api.Data
                 .HasOne(l => l.CreditDepot)
                 .WithMany()
                 .HasForeignKey(l => l.id_depot);
+
+            modelBuilder.Entity<Pensionnaire>()
+                .HasOne(l => l.Client)
+                .WithMany()
+                .HasForeignKey(l => l.ClientID);
+
+            modelBuilder.Entity<GarantieCredit>()
+                .HasOne(l => l.Credit)
+                .WithMany()
+                .HasForeignKey(l => l.CreditID);
         }
     }
 }

@@ -54,5 +54,31 @@
         public string? OriginDetails { get; set; }
         public ICollection<ClientManager>? ClientManagers { get; set; } = new List<ClientManager>();
 
+        // New fields
+        public int? Profession { get; set; }
+        public string? Nature_activity { get; set; }
+        public string? IfOrTp { get; set; }
+        public string? Adress_activity { get; set; }
+        public decimal? Honoraires { get; set; }
+        public DateTime? Date_debut_exercice { get; set; }
+        public string? Fonction { get; set; }
+        public string? Employeur { get; set; }
+        public DateTime? Date_Embauche { get; set; }
+        public decimal? Salaire { get; set; }
+        public string? NRC { get; set; }
+        public DateTime? Date_Creation_RC { get; set; }
+        public decimal? Revenu { get; set; }
+        public string? Denomination { get; set; }
+        public DateTime? Date_Creation_Company { get; set; }
+        public string? ActivityCompany { get; set; }
+        public decimal? Capital_Social { get; set; }
+        public decimal? ResultatYearN { get; set; }
+        public decimal? ChiffreAffaireYearN { get; set; }
+        public decimal? ResultatYearN_1 { get; set; }
+        public decimal? ChiffreAffaireYearN_1 { get; set; }
+        public decimal? PartsParticipationSociete { get; set; }
+        public int? Nature_Bail { get; set; }
+        public decimal? Rent { get; set; }
+
     }
 }
