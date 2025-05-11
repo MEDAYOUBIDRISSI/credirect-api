@@ -82,15 +82,202 @@ public class CredirectController : ControllerBase
 
     /////////////////////////////////////////////////
     ///
+    //[HttpGet("getAllClient")]
+    //public async Task<dynamic> GetAllClient()
+    //{
+    //    var entity = await _context.Client.Select(t => new { t.LastName, t.FirstName, t.Matricule } ).AsNoTracking().ToListAsync();
+    //    if (entity == null)
+    //    {
+    //        return NotFound();
+    //    }
+    //    return entity;
+    //}
+
     [HttpGet("getAllClient")]
-    public async Task<dynamic> GetAllClient()
+    public async Task<ActionResult<IEnumerable<object>>> GetAllClient()
     {
-        var entity = await _context.Client.Select(t => new { t.LastName, t.FirstName, t.Matricule } ).AsNoTracking().ToListAsync();
-        if (entity == null)
-        {
-            return NotFound();
-        }
-        return entity;
+        var clients = await _context.Client
+            .Include(c => c.ClientTitle)
+            .Include(c => c.Role)
+            .Include(c => c.MaritalStatus)
+            .Include(c => c.Country)
+            .Include(c => c.ResidenceCountry)
+            .Include(c => c.Origin)
+            .Include(c => c.ResidencyStatus)
+            .Include(c => c.ClientIdentity)
+            .Include(c => c.ClientLegalForm)
+            .Include(c => c.BusinessActivity)
+            .Include(c => c.CompanyCountry)
+            .Include(c => c.ClientManagers)
+                .ThenInclude(cm => cm.ManagerInformation)
+                    .ThenInclude(mi => mi.ManagerTitle)
+            .Include(c => c.ClientManagers)
+                .ThenInclude(cm => cm.ManagerInformation)
+                    .ThenInclude(mi => mi.ManagerCountry)
+            .Include(c => c.ClientManagers)
+                .ThenInclude(cm => cm.ManagerInformation)
+                    .ThenInclude(mi => mi.ManagerResidenceCountry)
+            .Include(c => c.ClientManagers)
+                .ThenInclude(cm => cm.ManagerInformation)
+                    .ThenInclude(mi => mi.ManagerMaritalStatus)
+            .Include(c => c.ClientManagers)
+                .ThenInclude(cm => cm.ManagerInformation)
+                    .ThenInclude(mi => mi.Identity)
+            .Select(c => new
+            {
+            // Basic Information
+            c.ClientID,
+                c.Matricule,
+                c.VIP,
+                c.is_individual,
+                c.is_organisation,
+
+            // Role Information
+            Role = c.Role != null ? new
+                {
+                    c.Role.RoleID,
+                    c.Role.RoleLabel
+                } : null,
+
+            // Personal Information
+            c.LastName,
+                c.FirstName,
+                c.BirthDate,
+                ClientTitle = c.ClientTitle != null ? new
+                {
+                    c.ClientTitle.ClientTitleID,
+                    c.ClientTitle.ClientTitleLabel
+                } : null,
+                c.Nationality,
+                c.Email,
+                ClientIdentity = c.ClientIdentity != null ? new
+                {
+                    c.ClientIdentity.IdentityID,
+                    c.ClientIdentity.IdentityLabel
+                } : null,
+                c.CIN,
+                c.PassportNumber,
+                c.ResidencePermit,
+
+            // Contact Information
+            c.Address,
+                c.City,
+                Country = c.Country != null ? new
+                {
+                    c.Country.ClientCountryID,
+                    c.Country.ClientCountryLabel,
+                } : null,
+                ResidenceCountry = c.ResidenceCountry != null ? new
+                {
+                    c.ResidenceCountry.ClientCountryID,
+                    c.ResidenceCountry.ClientCountryLabel,
+                } : null,
+                c.MobilePhone,
+                c.LandlinePhone,
+                c.WorkPhone,
+
+            // Marital Status
+            MaritalStatus = c.MaritalStatus != null ? new
+                {
+                    c.MaritalStatus.MaritalStatusID,
+                    c.MaritalStatus.MaritalStatusLabel
+                } : null,
+
+            // Residence Information
+            ResidencyStatus = c.ResidencyStatus != null ? new
+                {
+                    c.ResidencyStatus.ResidencyStatusID,
+                    c.ResidencyStatus.ResidencyStatusLabel
+                } : null,
+                c.IsOwner,
+                c.IsTenant,
+                c.RequestedAmount,
+
+            // Origin Information
+            Origin = c.Origin != null ? new
+                {
+                    c.Origin.OriginID,
+                    c.Origin.OriginLabel
+                } : null,
+                c.OriginDetails,
+
+            // Company Information
+            c.CompanyName,
+                LegalForm = c.ClientLegalForm != null ? new
+                {
+                    c.ClientLegalForm.LegalFormID,
+                    c.ClientLegalForm.LegalFormLabel
+                } : null,
+                c.CreationDate,
+                c.RegistrationNumber,
+                BusinessActivity = c.BusinessActivity != null ? new
+                {
+                    c.BusinessActivity.BusinessActivityID,
+                    c.BusinessActivity.BusinessActivityLabel
+                } : null,
+                c.SocialCapital,
+                c.CompanyAddress,
+                c.CompanyCity,
+                CompanyCountry = c.CompanyCountry != null ? new
+                {
+                    c.CompanyCountry.ClientCountryID,
+                    c.CompanyCountry.ClientCountryLabel,
+                } : null,
+
+            // Managers Information
+            Managers = c.ClientManagers.Select(cm => new
+                {
+                    cm.ClientManagerID,
+                    cm.ManagerID,
+                    ManagerInformation = cm.ManagerInformation != null ? new
+                    {
+                        cm.ManagerInformation.ManagerID,
+                        ManagerTitle = cm.ManagerInformation.ManagerTitle != null ? new
+                        {
+                            cm.ManagerInformation.ManagerTitle.ClientTitleID,
+                            cm.ManagerInformation.ManagerTitle.ClientTitleLabel
+                        } : null,
+                        cm.ManagerInformation.ManagerLastName,
+                        cm.ManagerInformation.ManagerFirstName,
+                        cm.ManagerInformation.ManagerBirthDate,
+                        cm.ManagerInformation.ManagerNationality,
+                        Identity = cm.ManagerInformation.Identity != null ? new
+                        {
+                            cm.ManagerInformation.Identity.IdentityID,
+                            cm.ManagerInformation.Identity.IdentityLabel
+                        } : null,
+                        cm.ManagerInformation.Id_Identity,
+                        cm.ManagerInformation.ManagerAddress,
+                        cm.ManagerInformation.ManagerCity,
+                        ManagerCountry = cm.ManagerInformation.ManagerCountry != null ? new
+                        {
+                            cm.ManagerInformation.ManagerCountry.ClientCountryID,
+                            cm.ManagerInformation.ManagerCountry.ClientCountryLabel,
+                        } : null,
+                        ManagerResidenceCountry = cm.ManagerInformation.ManagerResidenceCountry != null ? new
+                        {
+                            cm.ManagerInformation.ManagerResidenceCountry.ClientCountryID,
+                            cm.ManagerInformation.ManagerResidenceCountry.ClientCountryLabel,
+                        } : null,
+                        ManagerMaritalStatus = cm.ManagerInformation.ManagerMaritalStatus != null ? new
+                        {
+                            cm.ManagerInformation.ManagerMaritalStatus.MaritalStatusID,
+                            cm.ManagerInformation.ManagerMaritalStatus.MaritalStatusLabel
+                        } : null,
+                        cm.ManagerInformation.CIN,
+                        cm.ManagerInformation.CarteSejour,
+                        cm.ManagerInformation.Passeport
+                    } : null
+                }).ToList(),
+
+            // Utility Fields
+            HasCreditFiles = _context.LignCreditClient.Any(l => l.ClientID == c.ClientID),
+                CreatedDate = c.CreationDate ?? DateTime.Now
+            })
+            .AsNoTracking()
+            .ToListAsync();
+
+        return Ok(clients);
     }
 
     /////////////////////////////////////////////////
@@ -328,7 +515,7 @@ public class CredirectController : ControllerBase
         {
             // Update existing ManagerInformation
             existingManagerInfo.ManagerTitleID = managerInformation.ManagerTitleID;
-            existingManagerInfo.ManagerLastName = managerInformation.ManagerLastName ;
+            existingManagerInfo.ManagerLastName = managerInformation.ManagerLastName;
             existingManagerInfo.ManagerFirstName = managerInformation.ManagerFirstName;
             existingManagerInfo.ManagerBirthDate = managerInformation.ManagerBirthDate;
             existingManagerInfo.ManagerNationality = managerInformation.ManagerNationality;
@@ -354,131 +541,127 @@ public class CredirectController : ControllerBase
         try
         {
             var client = await _context.Client
-            .Include(c => c.ClientTitle)
-            .Include(c => c.Role)
-            .Include(c => c.MaritalStatus)
-            .Include(c => c.Country)
-            .Include(c => c.ResidenceCountry)
-            .Include(c => c.Origin)
-            .Include(c => c.ResidencyStatus)
-            .Include(c => c.ClientIdentity)
-            .Include(c => c.ClientLegalForm)
-            .Include(c => c.BusinessActivity)
-            .Include(c => c.CompanyCountry)
-            .Include(c => c.ClientManagers)
-                .ThenInclude(cm => cm.ManagerInformation)
-                    .ThenInclude(mi => mi.ManagerTitle)
-            .Include(c => c.ClientManagers)
-                .ThenInclude(cm => cm.ManagerInformation)
-                    .ThenInclude(mi => mi.ManagerCountry)
-            .Include(c => c.ClientManagers)
-                .ThenInclude(cm => cm.ManagerInformation)
-                    .ThenInclude(mi => mi.ManagerResidenceCountry)
-            .Include(c => c.ClientManagers)
-                .ThenInclude(cm => cm.ManagerInformation)
-                    .ThenInclude(mi => mi.ManagerMaritalStatus)
-            .FirstOrDefaultAsync(c => c.ClientID == id);
+                .Include(c => c.ClientTitle)
+                .Include(c => c.Role)
+                .Include(c => c.MaritalStatus)
+                .Include(c => c.Country)
+                .Include(c => c.ResidenceCountry)
+                .Include(c => c.Origin)
+                .Include(c => c.ResidencyStatus)
+                .Include(c => c.ClientIdentity)
+                .Include(c => c.ClientLegalForm)
+                .Include(c => c.BusinessActivity)
+                .Include(c => c.CompanyCountry)
+                .Include(c => c.ClientManagers)
+                    .ThenInclude(cm => cm.ManagerInformation)
+                        .ThenInclude(mi => mi.ManagerTitle)
+                .Include(c => c.ClientManagers)
+                    .ThenInclude(cm => cm.ManagerInformation)
+                        .ThenInclude(mi => mi.ManagerCountry)
+                .Include(c => c.ClientManagers)
+                    .ThenInclude(cm => cm.ManagerInformation)
+                        .ThenInclude(mi => mi.ManagerResidenceCountry)
+                .Include(c => c.ClientManagers)
+                    .ThenInclude(cm => cm.ManagerInformation)
+                        .ThenInclude(mi => mi.ManagerMaritalStatus)
+                .FirstOrDefaultAsync(c => c.ClientID == id);
 
             if (client == null)
             {
-                return NotFound();
+                return NotFound(new { success = false, message = "Client not found" });
             }
 
             // Map to a DTO or anonymous object to avoid circular references
             var result = new
             {
-                client.ClientID,
-                client.Matricule,
-                client.is_individual,
-                client.is_organisation,
+                // Client Information
+                ClientID = client.ClientID,
+                Matricule = client.Matricule,
+                is_individual = client.is_individual,
+                is_organisation = client.is_organisation,
                 Role = client.Role?.RoleLabel,
                 RoleID = client.RoleID,
 
-                // Personal Info
-                client.LastName,
-                client.FirstName,
-                client.BirthDate,
+                // Personal/Company Info
+                LastName = client.LastName,
+                FirstName = client.FirstName,
+                CompanyName = client.CompanyName,
+                BirthDate = client.BirthDate,
                 Title = client.ClientTitle?.ClientTitleLabel,
                 ClientTitleID = client.ClientTitleID,
-                client.Nationality,
-                client.Email,
+                Nationality = client.Nationality,
+                Email = client.Email,
                 Identity = client.ClientIdentity?.IdentityLabel,
                 IdentityID = client.IdentityID,
-                client.CIN,
-                client.PassportNumber,
-                client.ResidencePermit,
+                CIN = client.CIN,
+                PassportNumber = client.PassportNumber,
+                ResidencePermit = client.ResidencePermit,
 
                 // Contact Info
-                client.City,
+                City = client.City,
                 Country = client.Country?.ClientCountryLabel,
                 CountryID = client.CountryID,
                 ResidenceCountry = client.ResidenceCountry?.ClientCountryLabel,
                 ResidenceCountryID = client.ResidenceCountryID,
                 MaritalStatus = client.MaritalStatus?.MaritalStatusLabel,
                 MaritalStatusID = client.MaritalStatusID,
-                client.MobilePhone,
-                client.LandlinePhone,
-                client.WorkPhone,
-                client.Address,
+                MobilePhone = client.MobilePhone,
+                LandlinePhone = client.LandlinePhone,
+                WorkPhone = client.WorkPhone,
+                Address = client.Address,
 
-                // Residency Info
-                ResidencyStatus = client.ResidencyStatus?.ResidencyStatusLabel,
-                ResidencyStatusID = client.ResidencyStatusID,
-                client.IsOwner,
-                client.IsTenant,
-                client.RequestedAmount,
-                Origin = client.Origin?.OriginLabel,
-                OriginID = client.OriginID,
-                client.OriginDetails,
-
-                // Company Info
-                client.CompanyName,
+                // Company Specific Info
                 LegalForm = client.ClientLegalForm?.LegalFormLabel,
                 LegalFormID = client.LegalFormID,
-                client.CreationDate,
-                client.RegistrationNumber,
+                CreationDate = client.CreationDate,
+                RegistrationNumber = client.RegistrationNumber,
                 BusinessActivity = client.BusinessActivity?.BusinessActivityLabel,
                 BusinessActivityID = client.BusinessActivityID,
-                client.SocialCapital,
-                client.CompanyAddress,
-                client.CompanyCity,
+                SocialCapital = client.SocialCapital,
+                CompanyAddress = client.CompanyAddress,
+                CompanyCity = client.CompanyCity,
                 CompanyCountry = client.CompanyCountry?.ClientCountryLabel,
                 CompanyCountryID = client.CompanyCountryID,
 
-                // Managers
-                ClientManagers = client.ClientManagers?.Select(cm => new
+                // Managers Information
+                Managers = client.ClientManagers?.Select(cm => new
                 {
-                    cm.ManagerID,
-                    ManagerInformation = cm.ManagerInformation != null ? new
-                    {
-                        cm.ManagerInformation.ManagerID,
-                        Title = cm.ManagerInformation.ManagerTitle?.ClientTitleLabel,
-                        ManagerTitleID = cm.ManagerInformation.ManagerTitleID,
-                        cm.ManagerInformation.ManagerLastName,
-                        cm.ManagerInformation.ManagerFirstName,
-                        cm.ManagerInformation.ManagerBirthDate,
-                        cm.ManagerInformation.ManagerNationality,
-                        Id_Identity = cm.ManagerInformation.Id_Identity,
-                        cm.ManagerInformation.CIN,
-                        cm.ManagerInformation.CarteSejour,
-                        cm.ManagerInformation.Passeport,
-                        cm.ManagerInformation.ManagerAddress,
-                        cm.ManagerInformation.ManagerCity,
-                        //Country = cm.ManagerInformation.ManagerCountry?.ClientCountryLabel,
-                        ManagerCountryID = cm.ManagerInformation.ManagerCountryID,
-                        //ResidenceCountry = cm.ManagerInformation.ManagerResidenceCountry?.ClientCountryLabel,
-                        ManagerResidenceCountryID = cm.ManagerInformation.ManagerResidenceCountryID,
-                        //MaritalStatus = cm.ManagerInformation.ManagerMaritalStatus?.MaritalStatusLabel,
-                        Id_ManagerMaritalStatus = cm.ManagerInformation.Id_ManagerMaritalStatus
-                    } : null
+                    ManagerID = cm.ManagerID,
+                    Title = cm.ManagerInformation?.ManagerTitle?.ClientTitleLabel,
+                    ManagerTitleID = cm.ManagerInformation?.ManagerTitleID,
+                    LastName = cm.ManagerInformation?.ManagerLastName,
+                    FirstName = cm.ManagerInformation?.ManagerFirstName,
+                    BirthDate = cm.ManagerInformation?.ManagerBirthDate,
+                    Nationality = cm.ManagerInformation?.ManagerNationality,
+                    IdentityType = cm.ManagerInformation?.Id_Identity,
+                    CIN = cm.ManagerInformation?.CIN,
+                    CarteSejour = cm.ManagerInformation?.CarteSejour,
+                    Passeport = cm.ManagerInformation?.Passeport,
+                    Address = cm.ManagerInformation?.ManagerAddress,
+                    City = cm.ManagerInformation?.ManagerCity,
+                    Country = cm.ManagerInformation?.ManagerCountry?.ClientCountryLabel,
+                    CountryID = cm.ManagerInformation?.ManagerCountryID,
+                    ResidenceCountry = cm.ManagerInformation?.ManagerResidenceCountry?.ClientCountryLabel,
+                    ResidenceCountryID = cm.ManagerInformation?.ManagerResidenceCountryID,
+                    MaritalStatus = cm.ManagerInformation?.ManagerMaritalStatus?.MaritalStatusLabel,
+                    MaritalStatusID = cm.ManagerInformation?.Id_ManagerMaritalStatus
                 }).ToList()
             };
 
-            return Ok(result);
+            return Ok(new
+            {
+                success = true,
+                data = result
+            });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, $"Internal server error: {ex.Message}");
+            return StatusCode(500, new
+            {
+                success = false,
+                message = $"Internal server error: {ex.Message}",
+                stackTrace = ex.StackTrace
+            });
         }
     }
 
@@ -859,6 +1042,43 @@ public class CredirectController : ControllerBase
             status_code = 200,
             data = folders
         });
+    }
+
+    [HttpDelete("deleteClient/{id}")]
+    public async Task<IActionResult> DeleteClient(int id)
+    {
+        try
+        {
+            var client = await _context.Client.FindAsync(id);
+            if (client == null)
+            {
+                return NotFound(new { success = false, message = "Client not found." });
+            }
+
+            // Manually delete related records (if needed)
+            var managers = await _context.ClientManager
+                .Where(cm => cm.ClientID == id)
+                .Include(cm => cm.ManagerInformation)
+                .ToListAsync();
+
+            foreach (var manager in managers)
+            {
+                if (manager.ManagerInformation != null)
+                {
+                    _context.ManagerInformation.Remove(manager.ManagerInformation);
+                }
+                _context.ClientManager.Remove(manager);
+            }
+
+            _context.Client.Remove(client);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true, message = "Client deleted successfully." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
     }
 
 
