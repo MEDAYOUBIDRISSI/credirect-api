@@ -11,7 +11,7 @@
         public bool? Outstanding { get; set; }
         public bool? RepayableEarly { get; set; }
 
-        public NatureCommitment? NatureCommitment { get; set; }
+        public CreditType? NatureCommitment { get; set; }
         public AgencyBank? AgencyBank { get; set; }
         public Client? Client { get; set; }
     }
