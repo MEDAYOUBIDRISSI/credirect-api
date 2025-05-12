@@ -8,5 +8,7 @@
         public ManagerInformation? ManagerInformation { get; set; }
         public int? ManagerID { get; set; }
 
+        public DateTime? deleted_at { get; set; }
+
     }
 }
