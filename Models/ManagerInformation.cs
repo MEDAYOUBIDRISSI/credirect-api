@@ -24,6 +24,8 @@
         public string? Passeport { get; set; }
         public ICollection<ClientManager>? ClientManagers { get; set; } = new List<ClientManager>();
 
+        public DateTime? deleted_at { get; set; }
+
 
     }
 }

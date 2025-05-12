@@ -80,5 +80,7 @@
         public int? Nature_Bail { get; set; }
         public decimal? Rent { get; set; }
 
+        public DateTime? deleted_at { get; set; }
+
     }
 }
