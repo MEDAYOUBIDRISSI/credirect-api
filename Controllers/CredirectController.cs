@@ -1779,6 +1779,21 @@ public class CredirectController : ControllerBase
 
             await _context.SaveChangesAsync();
 
+            // Save or update LignCreditProperty
+            var lign = await _context.LignCreditProperty
+                .FirstOrDefaultAsync(x => x.CreditID == creditID);
+
+            if (lign == null)
+            {
+                lign = new LignCreditProperty { CreditID = creditID };
+                _context.LignCreditProperty.Add(lign);
+            }
+
+            if (json.TryGetProperty("honorairesFactures", out JsonElement ore))
+                lign.honorairesFactures = ore.GetDecimal();
+
+            await _context.SaveChangesAsync();
+
             return Ok(new
             {
                 status_code = 200,
@@ -1830,5 +1845,288 @@ public class CredirectController : ControllerBase
             return StatusCode(500, new { success = false, message = ex.Message });
         }
     }
+
+    [HttpPost("getCreditTimeline")]
+    public async Task<IActionResult> GetCreditTimeline(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+            int creditID = 0;
+
+            if (json.TryGetProperty("dossierID", out JsonElement creditElement) && creditElement.ValueKind == JsonValueKind.String)
+            {
+                int.TryParse(creditElement.GetString(), out creditID);
+            }
+
+            if (creditID == 0)
+                return BadRequest("dossierID est requis.");
+
+            var depot = await _context.CreditDepot
+                .Where(d => d.id_credit == creditID)
+                .OrderBy(d => d.created_at)
+                .FirstOrDefaultAsync();
+
+            var timeline = new List<object>();
+
+            if (depot != null)
+            {
+                timeline.Add(new
+                {
+                    statusID = 1,
+                    statusDB = 0,
+                    status = "Dépôt créé",
+                    date = depot.created_at?.ToString("dd/MM/yyyy HH:mm"),
+                    icon = "pi pi-play",
+                    color = "#8ecae6",
+                    is_accord = 0,
+                    @return = ""
+                });
+
+                timeline.Add(new
+                {
+                    statusID = 2,
+                    statusDB = 0,
+                    status = "Envoyer à la banque",
+                    date = depot.date_sent?.ToString("dd/MM/yyyy HH:mm"),
+                    icon = "pi pi-send",
+                    color = "#219ebc",
+                    is_accord = 1,
+                    @return = ""
+                });
+            }
+
+            var statuses = await _context.CreditStatus
+                .Where(s => s.id_credit == creditID)
+                .OrderBy(s => s.created_at)
+                .ToListAsync();
+
+            foreach (var s in statuses)
+            {
+                string icon = s.status switch
+                {
+                    2 => "pi pi-cog",
+                    3 => "pi pi-gift",
+                    4 => "pi pi-gift",
+                    5 => "pi pi-gift",
+                    6 => "pi pi-user-edit",
+                    7 => "pi pi-spinner",
+                    8 => "pi pi-user-edit",
+                    9 => "pi pi-check",
+                    _ => "pi pi-question"
+                };
+
+                string color = s.status switch
+                {
+                    2 => "#FF9800", // En étude bancaire
+                    3 => "#e63946", // Refus
+                    4 => "#023e8a", // Accord
+                    5 => "#023e8a", // Accordé sous condition
+                    6 => "#2dc653", // Rép client
+                    7 => "#FF9800", // En attente client
+                    8 => "#2dc653",
+                    9 => "#607D8B", // Livré
+                    _ => "#90A4AE"
+                };
+
+                timeline.Add(new
+                {
+                    statusID = s.status,
+                    statusDB = s.CreditStatusID,
+                    status = GetStatusLabel(s.status),
+                    date = s.created_at?.ToString("dd/MM/yyyy HH:mm"),
+                    icon = icon,
+                    color = color,
+                    is_accord = s.is_accord,
+                    is_accord_client = s.is_accord_client,
+                    @return = s.message
+                });
+            }
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                data = timeline
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    private string GetStatusLabel(int? status)
+    {
+        return status switch
+        {
+            3 => "Envoyer à la banque",
+            4 => "En étude bancaire",
+            5 => "Réponse de la banque",
+            9 => "En attente de la réponse du client",
+            10 => "Réponse du client",
+            11 => "Livré",
+            _ => "Statut inconnu"
+        };
+    }
+
+    [HttpPost("saveCreditStatus")]
+    public async Task<IActionResult> SaveCreditStatus(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int creditID = 0;
+            int depotID = 0;
+
+            if (json.TryGetProperty("id_credit", out JsonElement idCreditEl) && idCreditEl.ValueKind == JsonValueKind.Number)
+                creditID = idCreditEl.GetInt32();
+
+            if (json.TryGetProperty("id_depot", out JsonElement idDepotEl) && idDepotEl.ValueKind == JsonValueKind.Number)
+                depotID = idDepotEl.GetInt32();
+
+            int? status = null;
+            int? is_accord = null;
+            int? is_accord_client = null;
+            string? message = null;
+
+            if (json.TryGetProperty("status", out JsonElement statusEl) && statusEl.ValueKind == JsonValueKind.Number)
+                status = statusEl.GetInt32();
+
+            if (json.TryGetProperty("is_accord", out JsonElement akkan) && akkan.ValueKind == JsonValueKind.Number)
+                is_accord = akkan.GetInt32();
+
+            if (json.TryGetProperty("is_accord_client", out JsonElement cfc) && cfc.ValueKind == JsonValueKind.Number)
+                is_accord_client = cfc.GetInt32();
+
+            if (json.TryGetProperty("message", out JsonElement msgEl) && msgEl.ValueKind == JsonValueKind.String)
+                message = msgEl.GetString();
+
+            if (creditID == 0 || depotID == 0 || status == null)
+                return BadRequest("Informations manquantes pour l'enregistrement du statut.");
+
+            var creditStatus = new CreditStatus
+            {
+                id_credit = creditID,
+                id_depot = depotID,
+                is_accord = is_accord,
+                is_accord_client = is_accord_client,
+                status = status,
+                message = message,
+                created_at = DateTime.Now
+            };
+
+            _context.CreditStatus.Add(creditStatus);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                message = "Statut ajouté avec succès."
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("getDossiersByDepots")]
+    public async Task<IActionResult> getDossiersByDepots()
+    {
+        try
+        {
+            var depots = await (
+                from depot in _context.CreditDepot
+                join credit in _context.Credit on depot.id_credit equals credit.CreditID
+                join client in _context.Client on credit.Matricule equals client.Matricule into clientJoin
+                from client in clientJoin.DefaultIfEmpty()
+                join type in _context.CreditType on credit.CreditTypeID equals type.TypeID into typeJoin
+                from type in typeJoin.DefaultIfEmpty()
+                join bank in _context.AgencyBank on depot.id_agency_bank equals bank.AgencyBankID into bankJoin
+                from bank in bankJoin.DefaultIfEmpty()
+
+                select new
+                {
+                    depotId = depot.CreditDepotId,
+                    depotDate = depot.created_at,
+                    creditId = credit.CreditID,
+                    creditMatricule = credit.Matricule,
+                    creditAmount = credit.amount ?? 0,
+                    clientFullName = (client != null ? $"{client.FirstName} {client.LastName}" : "N/A"),
+                    typeLabel = type != null ? type.TypeLabel : "Type inconnu",
+                    banqueLabel = bank != null ? bank.AgencyBankLabel : "Banque inconnue"
+                }
+            ).ToListAsync();
+
+            var result = new List<object>();
+
+            foreach (var d in depots)
+            {
+                // Get latest status for this specific depot
+                var lastStatus = await _context.CreditStatus
+                    .Where(cs => cs.id_depot == d.depotId)
+                    .OrderByDescending(cs => cs.created_at)
+                    .Select(cs => cs.status)
+                    .FirstOrDefaultAsync();
+
+                string statusLabel = lastStatus switch
+                {
+                    2 => "En étude bancaire",
+                    3 => "Refusé",
+                    4 => "Accordé",
+                    5 => "Accordé sous condition",
+                    6 => "Réponse client",
+                    7 => "En attente client",
+                    8 => "Refus client",
+                    9 => "Livré",
+                    _ => "Dépôt créé"
+                };
+
+                int progression = lastStatus switch
+                {
+                    4 or 9 => 100,
+                    2 => 50,
+                    3 or 5 or 6 or 7 or 8 => 75,
+                    _ => 10
+                };
+
+                result.Add(new
+                {
+                    id = d.creditMatricule,
+                    creditId = d.creditId,
+                    depotId = d.depotId,
+                    client = d.clientFullName,
+                    type = d.typeLabel,
+                    montant = d.creditAmount,
+                    statut = statusLabel,
+                    dateCreation = d.depotDate,
+                    conseiller = (string?)null,
+                    banque = d.banqueLabel,
+                    progression = progression,
+                    panelMenuItems = new List<string>() // you can build dynamically if needed
+                });
+            }
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                data = result
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Erreur : " + ex.Message);
+            return StatusCode(500, new { message = "Erreur serveur", detail = ex.Message });
+        }
+    }
+
+
+
 
 }

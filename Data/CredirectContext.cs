@@ -42,6 +42,7 @@ namespace credirect_api.Data
         public DbSet<CreditStatus> CreditStatus { get; set; }
         public DbSet<Pensionnaire> Pensionnaire { get; set; }
         public DbSet<GarantieCredit> GarantieCredit { get; set; }
+        public DbSet<DepotStatus> DepotStatus { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -264,6 +265,16 @@ namespace credirect_api.Data
                 .HasOne(l => l.Credit)
                 .WithMany()
                 .HasForeignKey(l => l.CreditID);
+
+            modelBuilder.Entity<DepotStatus>()
+                .HasOne(l => l.Credit)
+                .WithMany()
+                .HasForeignKey(l => l.CreditID);
+
+            modelBuilder.Entity<DepotStatus>()
+                .HasOne(l => l.CreditDepot)
+                .WithMany()
+                .HasForeignKey(l => l.CreditDepotID);
         }
     }
 }
