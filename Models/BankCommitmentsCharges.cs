@@ -3,11 +3,12 @@
     public class BankCommitmentsCharges
     {
         public int BankCommitmentChargeID { get; set; }
-        public int NatureCommitmentID { get; set; }
+        public int? NatureCommitmentID { get; set; }
         public int? AgencyBankID { get; set; }
         public string? OtherAgency { get; set; }
-        public int ClientID { get; set; }
+        public int? ClientID { get; set; }
         public decimal? Maturity { get; set; }
+        public decimal? info_locataire { get; set; }
         public bool? Outstanding { get; set; }
         public bool? RepayableEarly { get; set; }
 

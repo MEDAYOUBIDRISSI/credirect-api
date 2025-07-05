@@ -123,6 +123,7 @@ public class CredirectController : ControllerBase
             .Include(c => c.ClientManagers)
                 .ThenInclude(cm => cm.ManagerInformation)
                     .ThenInclude(mi => mi.Identity)
+            .OrderByDescending(c => c.ClientID)
             .Select(c => new
             {
             // Basic Information
@@ -727,12 +728,86 @@ public class CredirectController : ControllerBase
 
         if (CIN != null)
         {
-            var Tier = await _context.Client.Where(b => b.CIN == CIN).Select(s => new
+            var Tier = await _context.Client.Where(b => b.CIN == CIN || b.RegistrationNumber == CIN || b.NRC == CIN || b.ResidencePermit == CIN || b.PassportNumber == CIN || b.NRC == CIN).Select(s => new
             {
                 s.ClientID,
                 s.CIN,
                 s.LastName,
                 s.FirstName,
+                denomination = s.CompanyName,
+                s.NRC,
+                s.RegistrationNumber,
+                is_complete = false,
+                tier_interv = 20,
+                role = s.is_organisation == true ? "Organisation" : s.Role.RoleLabel,
+                tel = s.MobilePhone,
+                civilite = s.ClientTitle.ClientTitleLabel,
+                dateNaissance = s.BirthDate,
+                nationalite = s.Nationality,
+                identite = s.ClientIdentity.IdentityLabel,
+                adresse = s.Address,
+                ville = s.City,
+                pays = s.Country.ClientCountryLabel,
+                paysResidence = s.ResidenceCountry.ClientCountryLabel,
+                situationFamiliale = "Celibataire",
+                telephoneMobile = s.MobilePhone,
+                telephoneFixe = s.LandlinePhone,
+                telephoneProfessionnel = s.WorkPhone,
+                email = s.Email,
+                statut = s.MaritalStatus.MaritalStatusLabel,
+                statutOccupation = "Locataire",
+                provenanceClient = "Agence immobilière",
+                origin = s.Origin.OriginLabel,
+                montantSollicite = "500,000 MAD",
+                s.is_organisation,
+                s.is_individual,
+                managers = _context.ManagerInformation.Where(b => b.ManagerTitleID == s.ClientID).ToList()
+            }).FirstOrDefaultAsync();
+            if (Tier == null)
+            {
+                return Ok(new
+                {
+                    success = true,
+                    status_code = 401,
+                    message = "not found."
+                });
+            }
+            else
+            {
+                return Ok(new
+                {
+                    success = true,
+                    status_code = 200,
+                    message = "Tier found.",
+                    data = Tier
+                });
+            }
+        }
+        return Ok(new
+        {
+            success = true,
+            status_code = 401,
+            message = "not found."
+        });
+    }
+
+    [HttpPost, Route("getTiresByIDFromFicheClient"), Produces("application/json")]
+    public async Task<IActionResult> getTiresByIDFromFicheClient(Client entity)
+    {
+
+        var clientID = entity.ClientID;
+
+        if (clientID != null)
+        {
+            var Tier = await _context.Client.Where(b => b.ClientID == clientID).Select(s => new
+            {
+                s.ClientID,
+                s.CIN,
+                s.LastName,
+                s.FirstName,
+                denomination = s.CompanyName,
+                s.NRC,
+                s.RegistrationNumber,
                 is_complete = false,
                 tier_interv = 20,
                 role = s.Role.RoleLabel,
@@ -754,7 +829,10 @@ public class CredirectController : ControllerBase
                 statutOccupation = "Locataire",
                 provenanceClient = "Agence immobilière",
                 origin = s.Origin.OriginLabel,
-                montantSollicite = "500,000 MAD"
+                montantSollicite = "500,000 MAD",
+                s.is_organisation,
+                s.is_individual,
+                managers = _context.ManagerInformation.Where(b => b.ManagerTitleID == s.ClientID).ToList()
             }).FirstOrDefaultAsync();
             if (Tier == null)
             {
@@ -863,9 +941,12 @@ public class CredirectController : ControllerBase
                 s.Client.CIN,
                 s.Client.LastName,
                 s.Client.FirstName,
+                denomination = s.Client.CompanyName,
+                s.Client.NRC,
+                s.Client.RegistrationNumber,
                 is_complete = false,
                 tier_interv = 20,
-                role = s.Client.Role.RoleLabel,
+                role = s.Client.is_organisation == true ? "Organisation" : s.Client.Role.RoleLabel,
                 tel = s.Client.MobilePhone,
                 civilite = s.Client.ClientTitle.ClientTitleLabel,
                 dateNaissance = s.Client.BirthDate,
@@ -888,7 +969,10 @@ public class CredirectController : ControllerBase
                 CreditID = s.CreditID,
                 Matricule = s.Credit.Matricule,
                 CreditTypeID = s.Credit.CreditType.TypeID,
-                CreditTypeLabel = s.Credit.CreditType.TypeLabel
+                CreditTypeLabel = s.Credit.CreditType.TypeLabel,
+                s.Client.is_organisation,
+                s.Client.is_individual,
+                managers = _context.ManagerInformation.Where(b => b.ManagerTitleID == s.ClientID).ToList()
 
             }).ToListAsync();
 
@@ -1059,18 +1143,20 @@ public class CredirectController : ControllerBase
     [HttpPost, Route("getFoldersList"), Produces("application/json")]
     public async Task<IActionResult> getFoldersList(dynamic entity)
     {
-        var folders = await _context.Credit.Select(s => new
+        var folders = await _context.Credit.OrderByDescending(c => c.CreditID).Select(s => new
         {
             idDossier = s.CreditID,
             id = s.Matricule,
             client = _context.LignCreditClient.AsNoTracking().Where(b => b.CreditID == s.CreditID).Select(s => s.Client.FirstName + " " + s.Client.LastName).FirstOrDefault(),
-            type= s.CreditType.TypeLabel,
+            companyName = _context.LignCreditClient.AsNoTracking().Where(b => b.CreditID == s.CreditID).Select(s => s.Client.CompanyName).FirstOrDefault(),
+            type = s.CreditType.TypeLabel,
             montant= s.amount,
             statut = "Refusé",
-            dateCreation = "2023-10-25",
+            dateCreation = "2025-05-14",
             conseiller = "Youssef Benali",
-            banque = "Société Générale Maroc",
-            progression= 100
+            banque = _context.CreditDepot.AsNoTracking().Where(b => b.id_credit == s.CreditID).Count(),
+            progression= 100,
+            is_organisation = _context.LignCreditClient.AsNoTracking().Where(b => b.CreditID == s.CreditID).Select(d => d.Client.is_organisation).FirstOrDefault(),
 
         }).ToListAsync();
 
@@ -1353,11 +1439,16 @@ public class CredirectController : ControllerBase
                 .Where(e => e.ClientID == clientID)
                 .ToListAsync();
 
+            var engagements_ClientInfo = await _context.Client
+                .Where(e => e.ClientID == clientID)
+                .FirstOrDefaultAsync();
+
             return Ok(new
             {
                 status_code = 200,
                 success = true,
-                data = engagements
+                data = engagements,
+                data_info = engagements_ClientInfo
             });
         }
         catch (Exception ex)
@@ -1370,55 +1461,125 @@ public class CredirectController : ControllerBase
     [HttpPost("saveEngagement")]
     public async Task<IActionResult> SaveEngagement(dynamic entity)
     {
+        //try
+        //{
+        //    JsonElement json = (JsonElement)entity;
+        //    int clientID = 0;
+        //    if (json.TryGetProperty("tierID", out JsonElement clientElement) && clientElement.ValueKind == JsonValueKind.String)
+        //    {
+        //        int.TryParse(clientElement.GetString(), out clientID);
+        //    }
+
+        //    if (!json.TryGetProperty("engagement", out JsonElement engagementElement))
+        //    {
+        //        return BadRequest("Engagement manquant.");
+        //    }
+
+        //    var engagement = JsonSerializer.Deserialize<BankCommitmentsCharges>(engagementElement.ToString());
+
+        //    if (clientID == 0 || engagement == null)
+        //        return BadRequest("ClientID ou engagement invalide.");
+
+        //    // Check for existing engagement
+        //    var existing = await _context.BankCommitmentsCharges
+        //        .FirstOrDefaultAsync(e => e.ClientID == clientID);
+
+        //    if (existing != null)
+        //    {
+        //        // Update existing
+        //        existing.NatureCommitmentID = engagement.NatureCommitmentID;
+        //        existing.AgencyBankID = engagement.AgencyBankID;
+        //        existing.OtherAgency = engagement.OtherAgency;
+        //        existing.Maturity = engagement.Maturity;
+        //        existing.Outstanding = engagement.Outstanding;
+        //        existing.RepayableEarly = engagement.RepayableEarly;
+        //    }
+        //    else
+        //    {
+        //        // New engagement
+        //        engagement.ClientID = clientID;
+        //        _context.BankCommitmentsCharges.Add(engagement);
+        //    }
+
+        //    await _context.SaveChangesAsync();
+
+        //    return Ok(new
+        //    {
+        //        status_code = 200,
+        //        success = true,
+        //        message = "Engagement enregistré avec succès."
+        //    });
+        //}
+        //catch (Exception ex)
+        //{
+        //    Console.WriteLine($"Erreur : {ex.Message}");
+        //    return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        //}
+
+
+
+        JsonElement json = (JsonElement)entity;
+
+        int clientID = 0;
+        if (json.TryGetProperty("tierID", out JsonElement clientElement) && clientElement.ValueKind == JsonValueKind.String)
+        {
+            int.TryParse(clientElement.GetString(), out clientID);
+        }
+
+        if (clientID == 0)
+            return BadRequest("ClientID manquant ou invalide.");
+
         try
         {
-            JsonElement json = (JsonElement)entity;
-
-            int clientID = 0;
-            if (json.TryGetProperty("tierID", out JsonElement clientElement) && clientElement.ValueKind == JsonValueKind.String)
+            // Deserialize infosBank list
+            if (json.TryGetProperty("engagement", out JsonElement infosElement))
             {
-                int.TryParse(clientElement.GetString(), out clientID);
+                var infosBankList = JsonSerializer.Deserialize<List<BankCommitmentsCharges>>(infosElement.ToString());
+
+                // Get existing records
+                var existingInfos = await _context.BankCommitmentsCharges
+                    .Where(i => i.ClientID == clientID)
+                    .ToListAsync();
+
+                // Update or add
+                foreach (var info in infosBankList)
+                {
+                    if (info.BankCommitmentChargeID > 0)
+                    {
+                        var existing = existingInfos.FirstOrDefault(x => x.BankCommitmentChargeID == info.BankCommitmentChargeID);
+                        if (existing != null)
+                        {
+                            existing.NatureCommitmentID = info.NatureCommitmentID;
+                            existing.AgencyBankID = info.AgencyBankID;
+                            existing.OtherAgency = info.OtherAgency;
+                            existing.Maturity = info.Maturity;
+                            existing.Outstanding = info.Outstanding;
+                            existing.RepayableEarly = info.RepayableEarly;
+                        }
+                    }
+                    else
+                    {
+                        info.ClientID = clientID;
+                        _context.BankCommitmentsCharges.Add(info);
+                    }
+                }
+
+                // Delete removed rows
+                var updatedIds = infosBankList.Where(x => x.BankCommitmentChargeID > 0).Select(x => x.BankCommitmentChargeID).ToList();
+                var toDelete = existingInfos.Where(x => !updatedIds.Contains(x.BankCommitmentChargeID)).ToList();
+                _context.BankCommitmentsCharges.RemoveRange(toDelete);
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    status_code = 200,
+                    message = "Mise à jour effectuée avec succès"
+                });
             }
 
-            if (!json.TryGetProperty("engagement", out JsonElement engagementElement))
-            {
-                return BadRequest("Engagement manquant.");
-            }
-
-            var engagement = JsonSerializer.Deserialize<BankCommitmentsCharges>(engagementElement.ToString());
-
-            if (clientID == 0 || engagement == null)
-                return BadRequest("ClientID ou engagement invalide.");
-
-            // Check for existing engagement
-            var existing = await _context.BankCommitmentsCharges
-                .FirstOrDefaultAsync(e => e.ClientID == clientID);
-
-            if (existing != null)
-            {
-                // Update existing
-                existing.NatureCommitmentID = engagement.NatureCommitmentID;
-                existing.AgencyBankID = engagement.AgencyBankID;
-                existing.OtherAgency = engagement.OtherAgency;
-                existing.Maturity = engagement.Maturity;
-                existing.Outstanding = engagement.Outstanding;
-                existing.RepayableEarly = engagement.RepayableEarly;
-            }
-            else
-            {
-                // New engagement
-                engagement.ClientID = clientID;
-                _context.BankCommitmentsCharges.Add(engagement);
-            }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                status_code = 200,
-                success = true,
-                message = "Engagement enregistré avec succès."
-            });
+            return BadRequest("Liste Engagement manquante.");
         }
         catch (Exception ex)
         {
@@ -1450,8 +1611,12 @@ public class CredirectController : ControllerBase
                 .Where(p => p.CreditID == creditID)
                 .ToListAsync();
 
+            var CreditType = await _context.Credit
+                .FirstOrDefaultAsync(x => x.CreditID == creditID);
+
             var result = new
             {
+                typeCredit = CreditType?.CreditTypeID,
                 objetCredit = lign?.ObjectCreditID,
                 montantCredit = lign?.MontantCredit,
                 dureeCredit = lign?.DureeCredit,
@@ -1461,6 +1626,7 @@ public class CredirectController : ControllerBase
                 derogationSouhaitee = lign?.DerogationSouhaite,
                 assurance = lign?.AssuranceDeczsInvalidite,
                 commentCredit = lign?.CommentCredit,
+                derogationSouhaiteeText = lign?.DerogationSouhaiteeText,
                 honorairesFactures = lign?.honorairesFactures,
                 biens = properties.Select(p => new
                 {
@@ -1475,6 +1641,167 @@ public class CredirectController : ControllerBase
                     valeurReelle = p.RealValueProperty,
                     montantTravaux = p.AmountWork
                 }).ToList()
+            };
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                data = new[] { result }
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("getAllPlanFinancementForPrint")]
+    public async Task<IActionResult> getAllPlanFinancementForPrint(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+            int creditID = 0;
+
+            if (json.TryGetProperty("dossierID", out JsonElement creditElement) && creditElement.ValueKind == JsonValueKind.String)
+            {
+                int.TryParse(creditElement.GetString(), out creditID);
+            }
+
+            if (creditID == 0)
+                return BadRequest("dossierID est requis.");
+
+
+            var credit = await _context.Credit
+                .Select(
+                    g => new
+                    {
+                        g.CreditID,
+                        g.Matricule,
+                        g.CreditType.TypeLabel,
+                        g.amount
+                    }
+                )
+                .FirstOrDefaultAsync(x => x.CreditID == creditID);
+
+            var clients = await _context.LignCreditClient
+                .Select(
+                    g => new
+                    {
+                        g.CreditID,
+                        client = g.Client,
+                        is_principal = g.IsPrincipal,
+                        percentageClient = g.PercentageClient,
+                        g.Client.ClientID,
+                        g.Client.CIN,
+                        g.Client.LastName,
+                        g.Client.FirstName,
+                        nomPrenom = g.Client.LastName + " " + g.Client.FirstName,
+                        is_complete = false,
+                        tier_interv = 20,
+                        role = g.Client.Role.RoleLabel,
+                        tel = g.Client.MobilePhone,
+                        civilite = g.Client.ClientTitle.ClientTitleLabel,
+                        dateNaissance = g.Client.BirthDate,
+                        nationalite = g.Client.Nationality,
+                        identite = g.Client.ClientIdentity.IdentityLabel,
+                        adresse = g.Client.Address,
+                        ville = g.Client.City,
+                        pays = g.Client.Country.ClientCountryLabel,
+                        paysResidence = g.Client.ResidenceCountry.ClientCountryLabel,
+                        situationFamiliale = "Celibataire",
+                        telephoneMobile = g.Client.MobilePhone,
+                        telephoneFixe = g.Client.LandlinePhone,
+                        telephoneProfessionnel = g.Client.WorkPhone,
+                        email = g.Client.Email,
+                        statut = g.Client.MaritalStatus.MaritalStatusLabel,
+                        statutOccupation = "Locataire",
+                        provenanceClient = "Agence immobilière",
+                        origin = g.Client.Origin.OriginLabel,
+                        montantSollicite = "500,000 MAD",
+                        // New fields
+                        Profession = g.Client.Profession,
+                        Nature_activity = g.Client.Nature_activity,
+                        IfOrTp = g.Client.IfOrTp,
+                        Adress_activity = g.Client.Adress_activity,
+                        Honoraires = g.Client.Honoraires,
+                        Date_debut_exercice = g.Client.Date_debut_exercice,
+                        Fonction = g.Client.Fonction,
+                        Employeur = g.Client.Employeur,
+                        Date_Embauche = g.Client.Date_Embauche,
+                        Salaire = g.Client.Salaire,
+                        NRC = g.Client.NRC,
+                        Date_Creation_RC = g.Client.Date_Creation_RC,
+                        Revenu = g.Client.Revenu,
+                        Denomination = g.Client.Denomination,
+                        Date_Creation_Company = g.Client.Date_Creation_Company,
+                        ActivityCompany = g.Client.ActivityCompany,
+                        Capital_Social = g.Client.Capital_Social,
+                        ResultatYearN = g.Client.ResultatYearN,
+                        ChiffreAffaireYearN = g.Client.ChiffreAffaireYearN,
+                        ResultatYearN_1 = g.Client.ResultatYearN_1,
+                        ChiffreAffaireYearN_1 = g.Client.ChiffreAffaireYearN_1,
+                        PartsParticipationSociete = g.Client.PartsParticipationSociete,
+                        Nature_Bail = g.Client.Nature_Bail,
+                        Rent = g.Client.Rent,
+                        pensions = _context.Pensionnaire
+                            .Where(p => p.ClientID == g.ClientID)
+                            .Select(p => new
+                            {
+                                p.Id,
+                                p.NaturePension,
+                                p.OrganismePension,
+                                p.TypePension,
+                                p.Montant
+                            })
+                            .ToList()
+                    }
+                )
+                .Where(p => p.CreditID == creditID)
+                .ToListAsync();
+
+            var lign = await _context.LignCreditProperty
+                .FirstOrDefaultAsync(x => x.CreditID == creditID);
+
+            var properties = await _context.Property
+                .Where(p => p.CreditID == creditID)
+                .ToListAsync();
+
+            var garantie = await _context.GarantieCredit
+                .Where(p => p.CreditID == creditID)
+                .ToListAsync();
+
+            var result = new
+            {
+                credit = credit,
+                clients = clients,
+                objetCredit = lign?.ObjectCreditID,
+                montantCredit = lign?.MontantCredit,
+                dureeCredit = lign?.DureeCredit,
+                frequenceRemboursement = lign?.FrequenceRemboursement,
+                dureeFranchise = lign?.DureeFranchise,
+                tauxCredit = lign?.TauxCredit,
+                derogationSouhaitee = lign?.DerogationSouhaite,
+                assurance = lign?.AssuranceDeczsInvalidite,
+                commentCredit = lign?.CommentCredit,
+                derogationSouhaiteeText = lign?.DerogationSouhaiteeText,
+                honorairesFactures = lign?.honorairesFactures,
+                biens = properties.Select(p => new
+                {
+                    nature = p.NaturePropertyID,
+                    affectation = p.AssignmentPropertyID,
+                    usage = p.UsePropertyID,
+                    etat = p.ConditionPropertyID,
+                    adresse = p.Adress,
+                    propertyArea = p.PropertyArea,
+                    titreFoncier = p.LandTitle,
+                    prixVente = p.SalePriceProperty,
+                    valeurReelle = p.RealValueProperty,
+                    montantTravaux = p.AmountWork
+                }).ToList(),
+                garantie = garantie
             };
 
             return Ok(new
@@ -1554,7 +1881,9 @@ public class CredirectController : ControllerBase
                 lign.honorairesFactures = ore.GetDecimal();
 
             lign.CommentCredit = planElement.TryGetProperty("commentCredit", out JsonElement toto) && toto.ValueKind == JsonValueKind.String ? toto.GetString() : null;
-            
+
+            lign.DerogationSouhaiteeText = planElement.TryGetProperty("derogationSouhaiteeText", out JsonElement dsElText) && dsElText.ValueKind == JsonValueKind.String ? dsElText.GetString() : null;
+
             // Remove old Properties
             var oldProps = await _context.Property
                 .Where(p => p.CreditID == creditID)
@@ -2057,9 +2386,11 @@ public class CredirectController : ControllerBase
                     creditId = credit.CreditID,
                     creditMatricule = credit.Matricule,
                     creditAmount = credit.amount ?? 0,
-                    clientFullName = (client != null ? $"{client.FirstName} {client.LastName}" : "N/A"),
+                    clientFullName = client.FirstName + " " + client.LastName,
                     typeLabel = type != null ? type.TypeLabel : "Type inconnu",
-                    banqueLabel = bank != null ? bank.AgencyBankLabel : "Banque inconnue"
+                    banqueLabel = bank != null ? bank.AgencyBankLabel : "Banque inconnue",
+                    companyName = client.CompanyName,
+                    is_organisation = client.is_organisation
                 }
             ).ToListAsync();
 
@@ -2100,7 +2431,7 @@ public class CredirectController : ControllerBase
                     id = d.creditMatricule,
                     creditId = d.creditId,
                     depotId = d.depotId,
-                    client = d.clientFullName,
+                    client = _context.LignCreditClient.AsNoTracking().Where(b => b.CreditID == d.creditId).Select(s => s.Client.FirstName + " " + s.Client.LastName).FirstOrDefault(),
                     type = d.typeLabel,
                     montant = d.creditAmount,
                     statut = statusLabel,
@@ -2108,6 +2439,8 @@ public class CredirectController : ControllerBase
                     conseiller = (string?)null,
                     banque = d.banqueLabel,
                     progression = progression,
+                    companyName = _context.LignCreditClient.AsNoTracking().Where(b => b.CreditID == d.creditId).Select(s => s.Client.CompanyName).FirstOrDefault(),
+                    is_organisation = _context.LignCreditClient.AsNoTracking().Where(b => b.CreditID == d.creditId).Select(s => s.Client.is_organisation).FirstOrDefault(),
                     panelMenuItems = new List<string>() // you can build dynamically if needed
                 });
             }
@@ -2125,6 +2458,398 @@ public class CredirectController : ControllerBase
             return StatusCode(500, new { message = "Erreur serveur", detail = ex.Message });
         }
     }
+
+    //public async Task<DataOutput> editEventCalendar(object record, int user_id)
+    //{
+    //    // On déclare les variables
+    //    DataOutput data_output = new DataOutput();
+    //    CheckRoleHelper checkrolehelper = new CheckRoleHelper(_context);
+    //    UploadHelper upload_helper = new UploadHelper(_context);
+    //    NotificationHelper notificationHelper = new NotificationHelper(_context);
+
+    //    dynamic body = "";
+    //    int id_user = 0;
+    //    int id_event = 0;
+
+    //    List<object> echec_user = new List<object>();
+    //    List<object> echec_event = new List<object>();
+
+    //    try
+    //    {
+    //        // On vérifie que record est plein
+    //        if (record == null || record.ToString().Length == 0)
+    //        {
+    //            // On définit le retour avec le détail de l'erreur
+    //            data_output.status_code = CodeReponse.error_missing_all_params;
+    //            data_output.message = MessageResponse.error_missing_all_params;
+    //        }
+    //        else
+    //        {
+    //            // On récupère les données envoyées dans le body
+    //            body = JObject.Parse(record.ToString());
+
+    //            // On valide l'existence de l'ensemble des champs attendus dans le body
+    //            if (!ValidationHelper.is_valid_add_event(body))
+    //            {
+    //                // On définit le résultat à retourner
+    //                data_output.status_code = CodeReponse.error_invalid_missing_params;
+    //                data_output.message = MessageResponse.error_invalid_missing_params;
+    //            }
+    //            else
+    //            {
+    //                // On extrait l'identifiant de l'utilisateur
+    //                id_user = user_id != 0 ? user_id : CryptageHelper.get_id((string)body.id_user);
+
+    //                // On extrait l'identifiant de l'événement
+    //                id_event = CryptageHelper.get_id((string)body.id_event);
+
+    //                // On extrait l'identifiant de la campagne
+    //                id_campaign = CryptageHelper.get_id((string)body.id_campaign);
+
+    //                id_organization = await _context.UserOrganization
+    //                    .Where(b => b.id_user == id_user && b.organization.is_verif && b.accepted == true && b.deleted_at == null)
+    //                    .Select(s => s.id_organization)
+    //                    .FirstOrDefaultAsync();
+
+    //                // On extrait le nom de la campagne
+    //                campaign_name = (string)body.campaign_name;
+
+    //                // On valide l'existence de la liaison entre l'utilisateur et l'organisation
+    //                if (!await checkrolehelper.is_valid_user_company(id_user, id_organization))
+    //                {
+    //                    // On définit le résultat à retourner
+    //                    data_output.status_code = CodeReponse.bad_request;
+    //                    data_output.message = MessageResponse.bad_request;
+    //                }
+    //                else
+    //                {
+    //                    // On recherche l'événement
+    //                    var _event = await _context.Event.Where(c => c.id == id_event).FirstOrDefaultAsync();
+
+    //                    if (_event != null)
+    //                    {
+    //                        _event.name = body.name;
+    //                        _event.description = body.description;
+    //                        _event.start_date = (DateTime)body.start_date;
+    //                        _event.end_date = (DateTime)body.end_date;
+    //                        _event.is_all_day = (bool)body.is_all_day;
+    //                        _event.is_public = (bool)body.is_public;
+    //                        _event.id_category_event = body.id_category;
+    //                        _event.id_type = body.id_type;
+
+    //                        if (body.meet_link != null && body.meet_link.ToString().Length > 0)
+    //                        {
+    //                            _event.meet_link = body.meet_link;
+    //                        }
+
+    //                        if (body.location_address != null && body.location_address.ToString().Length > 0)
+    //                        {
+    //                            _event.location_address = body.location_address;
+    //                        }
+
+    //                        // On sauvegarde les données
+    //                        await _context.SaveChangesAsync();
+
+    //                        var user = await _context.User.FindAsync(user_id);
+    //                        if (user == null)
+    //                        {
+    //                            data_output.status_code = CodeReponse.bad_request;
+    //                            data_output.message = "User not found.";
+    //                            return data_output;
+    //                        }
+
+    //                        bool isGoogleSyncEnabled = user.allow_async_calendar;
+    //                        var refreshToken = user.token_google_calendar;
+
+
+    //                        if (isGoogleSyncEnabled)
+    //                        {
+    //                            try
+    //                            {
+    //                                // Retrieve access token
+    //                                var accessToken = await GetAccessToken(refreshToken);
+    //                                if (string.IsNullOrEmpty(accessToken))
+    //                                {
+    //                                    data_output.message = "Error: Failed to retrieve a valid access token.";
+    //                                    return data_output;
+    //                                }
+
+    //                                // Prepare event data for Google Calendar
+    //                                var googleEventData = new Dictionary<string, object>
+    //                                        {
+    //                                            { "summary", _event.name },
+    //                                            { "start", new Dictionary<string, object> { { "dateTime", _event.start_date.ToString("yyyy-MM-ddTHH:mm:ssZ") }, { "timeZone", "Africa/Casablanca" } } },
+    //                                            { "end", new Dictionary<string, object> { { "dateTime", _event.end_date.ToString("yyyy-MM-ddTHH:mm:ssZ") }, { "timeZone", "Africa/Casablanca" } } }
+    //                                        };
+
+    //                                // Sync the event with Google Calendar
+    //                                await UpdateEventInGoogleCalendar(_event.hash_calendar, googleEventData, accessToken);
+    //                            }
+    //                            catch (Exception ex)
+    //                            {
+    //                                data_output.message = "Event updated in database, but failed to sync with Google Calendar.";
+    //                            }
+    //                        }
+    //                        else
+    //                        {
+    //                            Debug.WriteLine("Google sync is disabled. Event updated only in the database.");
+    //                        }
+
+
+
+    //                        var guests = new List<Object>();
+
+    //                        // On boucle sur les experts
+    //                        foreach (var e in body.experts)
+    //                        {
+    //                            int id_expert = 0;
+    //                            id_expert = CryptageHelper.get_id((string)e.id);
+    //                            bool is_required = (bool)e.required;
+
+    //                            if ((bool)e.deleted)
+    //                            {
+    //                                var exists = await _context.EventUserCampaign
+    //                                    .Where(b => b.id_event == id_event && b.is_required == is_required && b.id_user == id_expert && b.deleted_at == null)
+    //                                    .FirstOrDefaultAsync();
+
+    //                                if (exists != null)
+    //                                {
+    //                                    exists.deleted_at = DateTime.UtcNow;
+    //                                    exists.deleted_by = id_user.ToString();
+    //                                }
+    //                            }
+    //                            else
+    //                            {
+    //                                var exists = await _context.EventUserCampaign
+    //                                    .AnyAsync(b => b.id_event == id_event && b.is_required == is_required && b.id_user == id_expert && b.deleted_at == null);
+
+    //                                if (!exists)
+    //                                {
+    //                                    var existUserEvaluator = await _context.CampaignEvaluator.AnyAsync(b => b.id_user == id_expert && b.id_campaign == id_campaign && b.deleted_at == null);
+
+    //                                    var existUser = await _context.User.AnyAsync(b => b.id == id_expert && !b.blocked && (b.is_expert || existUserEvaluator) && b.deleted_at == null);
+
+    //                                    if (existUser)
+    //                                    {
+    //                                        // On initialise l'entité
+    //                                        EventUserCampaign event_user_campaign = new EventUserCampaign
+    //                                        {
+    //                                            id_event = _event.id,
+    //                                            id_campaign = id_campaign,
+    //                                            id_user = id_expert,
+    //                                            id_role = (int?)RoleId.expert,
+    //                                            is_required = e.required
+    //                                        };
+
+    //                                        // On ajoute l'entité
+    //                                        await _context.EventUserCampaign.AddAsync(event_user_campaign);
+
+    //                                        // On sauvegarde les données
+    //                                        await _context.SaveChangesAsync();
+
+    //                                        guests.Add(e);
+    //                                    }
+    //                                    else
+    //                                    {
+    //                                        // On définit le résultat à retourner
+    //                                        data_output.status_code = CodeReponse.bad_request;
+    //                                        data_output.message = MessageResponse.bad_request;
+    //                                    }
+    //                                }
+    //                            }
+    //                        }
+
+    //                        // On boucle sur les participants
+    //                        foreach (var e in body.participants)
+    //                        {
+    //                            int id_participant = 0;
+    //                            id_participant = CryptageHelper.get_id((string)e.id);
+    //                            e.id = id_participant;
+    //                            bool is_required = (bool)e.required;
+
+    //                            if ((bool)e.deleted)
+    //                            {
+    //                                var exists = await _context.EventUserCampaign
+    //                                    .Where(b => b.id_event == id_event && b.is_required == is_required && b.id_user == id_participant && b.deleted_at == null)
+    //                                    .FirstOrDefaultAsync();
+
+    //                                if (exists != null)
+    //                                {
+    //                                    exists.deleted_at = DateTime.UtcNow;
+    //                                    exists.deleted_by = id_user.ToString();
+    //                                }
+    //                            }
+    //                            else
+    //                            {
+    //                                //if (await checkrolehelper.is_valid_user_company(id_participant, id_organization))
+    //                                //{
+    //                                var exists = await _context.EventUserCampaign
+    //                                    .Where(b => b.id_event == id_event && b.is_required == is_required && b.id_user == id_participant)
+    //                                    .FirstOrDefaultAsync();
+
+    //                                if (exists == null)
+    //                                {
+    //                                    // On initialise l'entité
+    //                                    EventUserCampaign event_user_campaign = new EventUserCampaign
+    //                                    {
+    //                                        id_event = _event.id,
+    //                                        id_campaign = id_campaign,
+    //                                        id_user = id_participant,
+    //                                        id_role = (int?)RoleId.membre_orga,
+    //                                        is_required = e.required
+    //                                    };
+
+    //                                    // On ajoute l'entité
+    //                                    await _context.EventUserCampaign.AddAsync(event_user_campaign);
+
+    //                                    // On sauvegarde les données
+    //                                    await _context.SaveChangesAsync();
+
+    //                                    guests.Add(e);
+    //                                }
+    //                                else
+    //                                {
+    //                                    exists.deleted_at = null;
+    //                                    exists.deleted_by = null;
+    //                                }
+    //                                //}
+    //                                //else
+    //                                //{
+    //                                //    // On définit le résultat à retourner
+    //                                //    data_output.status_code = CodeReponse.bad_request;
+    //                                //    data_output.message = MessageResponse.bad_request;
+    //                                //}
+    //                            }
+    //                        }
+
+    //                        // On sauvegarde les données
+    //                        await _context.SaveChangesAsync();
+
+    //                        // On envoie un email aux invités
+    //                        var notification_body = new
+    //                        {
+    //                            guests = guests,
+    //                            id_invitation = CommModelCode.InvToCampaignEvent,
+    //                            id_user = id_user,
+    //                            id_campaign = id_campaign,
+    //                            campaign_name = campaign_name,
+    //                            event_name = body.name,
+    //                            id_event = _event.id
+    //                        };
+
+    //                        var output = await notificationHelper.campaign_send(notification_body);
+
+    //                        var exist_event = await _context.Event
+    //                       .Where(b => b.id == _event.id && b.deleted_at == null).Select(x => x.name)
+    //                       .FirstOrDefaultAsync();
+
+    //                        if (body.po != null)
+    //                        {
+
+    //                            var pos = new List<Object>();
+
+    //                            // On boucle sur les porteurs de projets
+    //                            foreach (var user_po in body.po)
+    //                            {
+    //                                // On extrait l'identifiant du porteur de projets
+    //                                var id_po = CryptageHelper.get_id((string)user_po);
+
+    //                                var exist_po = await _context.CampaignProject.AnyAsync(b => b.id_po == id_po && b.deleted_at == null && b.po.is_project_owner);
+    //                                var exist_po_in_event = await _context.EventUserCampaign.AnyAsync(b => b.id_user == id_po && b.deleted_at == null && b.id_event == id_event);
+
+    //                                var po = await _context.User
+    //                                    .Where(b => b.id == id_po && b.deleted_at == null)
+    //                                    .Select(x => new
+    //                                    {
+    //                                        id = x.id,
+    //                                        full_name = x.first_name + " " + x.last_name,
+    //                                        email = x.email,
+    //                                        username = x.username
+    //                                    })
+    //                                    .FirstOrDefaultAsync();
+
+    //                                if (exist_po && !exist_po_in_event)
+    //                                {
+    //                                    EventUserCampaign event_user_campaign = new EventUserCampaign
+    //                                    {
+    //                                        id_event = id_event,
+    //                                        id_campaign = id_campaign,
+    //                                        id_user = id_po,
+    //                                        id_role = (int)RoleId.project_owner
+    //                                    };
+
+    //                                    // On ajoute l'entité
+    //                                    await _context.EventUserCampaign.AddAsync(event_user_campaign);
+
+    //                                    // On sauvegarde les données
+    //                                    await _context.SaveChangesAsync();
+
+    //                                    pos.Add(po);
+    //                                }
+    //                                else
+    //                                {
+    //                                    if (!exist_po)
+    //                                    {
+    //                                        echec_user.Add(new { name_event = exist_event, name_po = po.full_name, message = "PO Not Found" });
+    //                                    }
+    //                                    if (exist_po_in_event)
+    //                                    {
+    //                                        echec_user.Add(new { name_event = exist_event, name_po = po.full_name, message = "Project Already exist in event" });
+    //                                    }
+    //                                }
+    //                            }
+
+    //                            // On envoie un email aux invités
+    //                            var notification_body_ = new
+    //                            {
+    //                                guests = pos,
+    //                                id_invitation = CommModelCode.InvToCampaignEvent,
+    //                                id_user = id_user,
+    //                                id_campaign = id_campaign,
+    //                                campaign_name = campaign_name,
+    //                                event_name = exist_event,
+    //                                id_event = id_event
+    //                            };
+
+    //                            var output_ = await notificationHelper.campaign_send(notification_body_);
+    //                        }
+
+    //                        //object resultat = new { echec_user = echec_user };
+
+
+    //                        // On définit le résultat à retourner
+    //                        data_output.status_code = CodeReponse.ok;
+    //                        data_output.message = MessageResponse.ok;
+    //                        data_output.data = new List<object> { CryptageHelper.set_id(_event.id) };
+    //                    }
+    //                    else
+    //                    {
+    //                        // On définit le retour avec le détail de l'erreur
+    //                        data_output.status_code = CodeReponse.not_found;
+    //                        data_output.message = MessageResponse.not_found;
+    //                    }
+    //                }
+    //            }
+    //        }
+    //    }
+    //    catch (Exception e)
+    //    {
+    //        // On définit le retour avec le détail de l'erreur
+    //        data_output.status_code = CodeReponse.error;
+    //        data_output.message = (e.InnerException == null) ? e.Message : e.InnerException.Message;
+
+    //        // On log l'erreur
+    //        await new Log(e, this.GetType().Name, MethodBase.GetCurrentMethod().ReflectedType.Name).log_exception(_context);
+    //    }
+    //    finally
+    //    {
+
+    //    }
+
+    //    // On retourne le résultat
+    //    return data_output;
+    //}
+
 
 
 
