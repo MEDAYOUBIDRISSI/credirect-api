@@ -271,8 +271,9 @@ public class CredirectController : ControllerBase
                     } : null
                 }).ToList(),
 
-            // Utility Fields
-            HasCreditFiles = _context.LignCreditClient.Any(l => l.ClientID == c.ClientID),
+                // Utility Fields
+                HasCreditFiles = _context.LignCreditClient.Any(l => l.ClientID == c.ClientID),
+                CreditID = _context.LignCreditClient.Where(l => l.ClientID == c.ClientID).OrderByDescending(l => l.LignCreditClientID).Select(u=> u.CreditID).FirstOrDefault(),
                 CreatedDate = c.CreationDate ?? DateTime.Now
             })
             .AsNoTracking()
@@ -879,10 +880,14 @@ public class CredirectController : ControllerBase
             int CreditTypeID = json.TryGetProperty("creditType", out JsonElement creditTypeElement) && creditTypeElement.ValueKind != JsonValueKind.Null
                                 ? creditTypeElement.GetInt32()
                                 : 0;
+            int userBoID = json.TryGetProperty("user_bo", out JsonElement userBoElement) && userBoElement.ValueKind != JsonValueKind.Null
+                                ? userBoElement.GetInt32()
+                                : 0;
             var newfolder = new Credit
             {
                 Matricule = generatedMatricule,
-                CreditTypeID = CreditTypeID
+                CreditTypeID = CreditTypeID,
+                created_by = userBoID
             };
 
             await _context.Credit.AddAsync(newfolder);
@@ -1085,16 +1090,17 @@ public class CredirectController : ControllerBase
                 ville = s.City,
                 pays = s.Country.ClientCountryLabel,
                 paysResidence = s.ResidenceCountry.ClientCountryLabel,
-                situationFamiliale = "Celibataire",
+                situationFamiliale = s.MaritalStatus.MaritalStatusLabel,
                 telephoneMobile = s.MobilePhone,
                 telephoneFixe = s.LandlinePhone,
                 telephoneProfessionnel = s.WorkPhone,
                 email = s.Email,
-                statut = s.MaritalStatus.MaritalStatusLabel,
-                statutOccupation = "Locataire",
-                provenanceClient = "Agence immobilière",
+                statut = s.ResidencyStatus.ResidencyStatusLabel,
+                statutOccupation = s.IsOwner == true ? "Propriétaire" : "Locataire",
+                provenanceClient = s.Origin.OriginLabel,
+                provenanceClientDetail = s.OriginDetails,
                 origin = s.Origin.OriginLabel,
-                montantSollicite = "500,000 MAD",
+                montantSollicite = s.RequestedAmount,
                 // New fields
                 Profession = s.Profession,
                 Nature_activity = s.Nature_activity,
@@ -1151,14 +1157,23 @@ public class CredirectController : ControllerBase
             companyName = _context.LignCreditClient.AsNoTracking().Where(b => b.CreditID == s.CreditID).Select(s => s.Client.CompanyName).FirstOrDefault(),
             type = s.CreditType.TypeLabel,
             montant= s.amount,
-            statut = "Refusé",
+            statut = s.credit_statut,
             dateCreation = "2025-05-14",
-            conseiller = "Youssef Benali",
+            conseiller = s.created_by != null ? s.User_bo.First_Name + " " + s.User_bo.Last_Name : "Test",
+            //conseiller = "Test",
             banque = _context.CreditDepot.AsNoTracking().Where(b => b.id_credit == s.CreditID).Count(),
             progression= 100,
+            is_submit = s.is_submit,
             is_organisation = _context.LignCreditClient.AsNoTracking().Where(b => b.CreditID == s.CreditID).Select(d => d.Client.is_organisation).FirstOrDefault(),
+            remarques = _context.CreditRemark.AsNoTracking().Where(b => b.id_credit == s.CreditID).Select(q => new
+            {
+                q.remark,
+                user_bo = q.User_bo
+            }).ToList(),
 
-        }).ToListAsync();
+        })
+        .OrderByDescending(d => d.idDossier)
+        .ToListAsync();
 
         return Ok(new
         {
@@ -1167,6 +1182,84 @@ public class CredirectController : ControllerBase
             data = folders
         });
     }
+
+    [HttpPost, Route("getFoldersListRe"), Produces("application/json")]
+    public async Task<IActionResult> getFoldersListRe(dynamic entity)
+    {
+        var folders = await _context.Credit
+            .Where(c => c.is_submit == true && c.credit_statut != 6)
+            .Select(s => new
+            {
+                credit = new
+                {
+                    idDossier = s.CreditID,
+                    id = s.Matricule,
+                    client = _context.LignCreditClient.AsNoTracking().Where(b => b.CreditID == s.CreditID).Select(s => s.Client.FirstName + " " + s.Client.LastName).FirstOrDefault(),
+                    companyName = _context.LignCreditClient.AsNoTracking().Where(b => b.CreditID == s.CreditID).Select(s => s.Client.CompanyName).FirstOrDefault(),
+                    type = s.CreditType.TypeLabel,
+                    montant = s.amount,
+                    statut = s.credit_statut,
+                    dateCreation = "2025-05-14",
+                    conseiller = s.created_by != null ? s.User_bo.First_Name + " " + s.User_bo.Last_Name : "Test",
+                    //conseiller = "Test",
+                    banque = _context.CreditDepot.AsNoTracking().Where(b => b.id_credit == s.CreditID).Count(),
+                    progression = 100,
+                    is_submit = s.is_submit,
+                    is_organisation = _context.LignCreditClient.AsNoTracking().Where(b => b.CreditID == s.CreditID).Select(d => d.Client.is_organisation).FirstOrDefault(),
+                },
+                depots = _context.CreditDepot.AsNoTracking().Where(b => b.id_credit == s.CreditID).ToList()
+
+            })
+            .OrderByDescending(d => d.credit.idDossier)
+            .ToListAsync();
+
+        return Ok(new
+        {
+            success = true,
+            status_code = 200,
+            data = folders
+        });
+    }
+
+    [HttpPost, Route("getFoldersListCPCC"), Produces("application/json")]
+    public async Task<IActionResult> getFoldersListCPCC(dynamic entity)
+    {
+        var folders = await _context.Credit.OrderByDescending(c => c.CreditID)
+            .Where(p => p.credit_statut == 2 || p.credit_statut == 5 || p.credit_statut == 6)
+            .Select(s => new
+            {
+                credit = new
+                {
+                    idDossier = s.CreditID,
+                    id = s.Matricule,
+                    client = _context.LignCreditClient.AsNoTracking().Where(b => b.CreditID == s.CreditID).Select(s => s.Client.FirstName + " " + s.Client.LastName).FirstOrDefault(),
+                    companyName = _context.LignCreditClient.AsNoTracking().Where(b => b.CreditID == s.CreditID).Select(s => s.Client.CompanyName).FirstOrDefault(),
+                    type = s.CreditType.TypeLabel,
+                    montant = s.amount,
+                    statut = s.credit_statut,
+                    dateCreation = "2025-05-14",
+                    conseiller = s.created_by != null ? s.User_bo.First_Name + " " + s.User_bo.Last_Name : "Test",
+                    //conseiller = "Test",
+                    banque = _context.CreditDepot.AsNoTracking().Where(b => b.id_credit == s.CreditID).Count(),
+                    progression = 100,
+                    is_submit = s.is_submit,
+                    is_organisation = _context.LignCreditClient.AsNoTracking().Where(b => b.CreditID == s.CreditID).Select(d => d.Client.is_organisation).FirstOrDefault(),
+                },
+                depots = _context.CreditDepot.AsNoTracking().Where(b => b.id_credit == s.CreditID && b.depot_statut != 2).ToList()
+
+
+            })
+            .OrderByDescending(d => d.credit.idDossier)
+            .ToListAsync();
+
+        return Ok(new
+        {
+            success = true,
+            status_code = 200,
+            data = folders
+        });
+    }
+
 
     [HttpPost("saveTierInfoProf")]
     public async Task<IActionResult> saveTierInfoProf(dynamic entity)
@@ -1679,9 +1772,11 @@ public class CredirectController : ControllerBase
                     g => new
                     {
                         g.CreditID,
+                        g.CreditTypeID,
                         g.Matricule,
                         g.CreditType.TypeLabel,
-                        g.amount
+                        g.amount,
+                        user_bo = g.User_bo 
                     }
                 )
                 .FirstOrDefaultAsync(x => x.CreditID == creditID);
@@ -1711,13 +1806,13 @@ public class CredirectController : ControllerBase
                         ville = g.Client.City,
                         pays = g.Client.Country.ClientCountryLabel,
                         paysResidence = g.Client.ResidenceCountry.ClientCountryLabel,
-                        situationFamiliale = "Celibataire",
+                        situationFamiliale = g.Client.MaritalStatus.MaritalStatusLabel,
                         telephoneMobile = g.Client.MobilePhone,
                         telephoneFixe = g.Client.LandlinePhone,
                         telephoneProfessionnel = g.Client.WorkPhone,
                         email = g.Client.Email,
                         statut = g.Client.MaritalStatus.MaritalStatusLabel,
-                        statutOccupation = "Locataire",
+                        statutOccupation = g.Client.IsOwner == true ? "Propriétaire" : "Locataire",
                         provenanceClient = "Agence immobilière",
                         origin = g.Client.Origin.OriginLabel,
                         montantSollicite = "500,000 MAD",
@@ -1756,7 +1851,13 @@ public class CredirectController : ControllerBase
                                 p.TypePension,
                                 p.Montant
                             })
-                            .ToList()
+                            .ToList(),
+                       infosBankList = _context.InfosBank
+                               .Where(i => i.ClientID == g.ClientID)
+                               .ToList(),
+                       engagements = _context.BankCommitmentsCharges
+                                .Where(e => e.ClientID == g.ClientID)
+                                .ToList()
                     }
                 )
                 .Where(p => p.CreditID == creditID)
@@ -1929,6 +2030,369 @@ public class CredirectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
         }
     }
+
+    [HttpPost("saveSubmitFolder")]
+    public async Task<IActionResult> saveSubmitFolder(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int creditID = json.TryGetProperty("dossierID", out JsonElement dossierIDoElement) && dossierIDoElement.ValueKind != JsonValueKind.Null
+                                ? dossierIDoElement.GetInt32()
+                                : 0;
+
+
+            if (creditID == 0)
+                return BadRequest("dossierID est requis.");
+
+            // Save or update LignCreditProperty
+            var lign = await _context.Credit
+                .FirstOrDefaultAsync(x => x.CreditID == creditID);
+
+            lign.is_submit = true;
+            lign.credit_statut = 1;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                message = "Submit enregistré avec succès."
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("saveSubmitFolderToCC")]
+    public async Task<IActionResult> saveSubmitFolderToCC(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int creditID = json.TryGetProperty("dossierID", out JsonElement dossierIDoElement) && dossierIDoElement.ValueKind != JsonValueKind.Null
+                                ? dossierIDoElement.GetInt32()
+                                : 0;
+
+            int userBoID = json.TryGetProperty("user_bo", out JsonElement userBoElement) && userBoElement.ValueKind != JsonValueKind.Null
+                                ? userBoElement.GetInt32()
+                                : 0;
+            var remarque = json.TryGetProperty("remarque", out JsonElement dsElText) && dsElText.ValueKind == JsonValueKind.String ? dsElText.GetString() : null;
+
+            if (creditID == 0)
+                return BadRequest("dossierID est requis.");
+
+            // Save or update LignCreditProperty
+            var lign = await _context.Credit
+                .FirstOrDefaultAsync(x => x.CreditID == creditID);
+            lign.credit_statut = 3;
+            await _context.SaveChangesAsync();
+
+            var newProp = new CreditRemark
+            {
+                id_credit = creditID,
+                remark = remarque,
+                userID = userBoID,
+                from_cc = false
+            };
+
+            _context.CreditRemark.Add(newProp);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                message = "Submit enregistré avec succès."
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("saveSubmitFolderToCCP")]
+    public async Task<IActionResult> saveSubmitFolderToCCP(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int creditID = json.TryGetProperty("dossierID", out JsonElement dossierIDoElement) && dossierIDoElement.ValueKind != JsonValueKind.Null
+                                ? dossierIDoElement.GetInt32()
+                                : 0;
+
+
+            if (creditID == 0)
+                return BadRequest("dossierID est requis.");
+
+            // Save or update LignCreditProperty
+            var lign = await _context.Credit
+                .FirstOrDefaultAsync(x => x.CreditID == creditID);
+
+            lign.credit_statut = 2;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                message = "Submit enregistré avec succès."
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("saveSubmitFolderToCCFromCPCC")]
+    public async Task<IActionResult> saveSubmitFolderToCCFromCPCC(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int creditID = json.TryGetProperty("dossierID", out JsonElement dossierIDoElement) && dossierIDoElement.ValueKind != JsonValueKind.Null
+                                ? dossierIDoElement.GetInt32()
+                                : 0;
+            int userBoID = json.TryGetProperty("user_bo", out JsonElement userBoElement) && userBoElement.ValueKind != JsonValueKind.Null
+                                ? userBoElement.GetInt32()
+                                : 0;
+            var remarque = json.TryGetProperty("remarque", out JsonElement dsElText) && dsElText.ValueKind == JsonValueKind.String ? dsElText.GetString() : null;
+
+            if (creditID == 0)
+                return BadRequest("dossierID est requis.");
+
+            // Save or update LignCreditProperty
+            var lign = await _context.Credit
+                .FirstOrDefaultAsync(x => x.CreditID == creditID);
+
+            lign.credit_statut = 5;
+
+            await _context.SaveChangesAsync();
+
+            var newProp = new CreditRemark
+            {
+                id_credit = creditID,
+                remark = remarque,
+                userID = userBoID,
+                from_cc = false
+            };
+
+            _context.CreditRemark.Add(newProp);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                message = "Submit enregistré avec succès."
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("saveSubmitFolderToCCPFromCPCC")]
+    public async Task<IActionResult> saveSubmitFolderToCCPFromCPCC(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int creditID = json.TryGetProperty("dossierID", out JsonElement dossierIDoElement) && dossierIDoElement.ValueKind != JsonValueKind.Null
+                                ? dossierIDoElement.GetInt32()
+                                : 0;
+
+
+            if (creditID == 0)
+                return BadRequest("dossierID est requis.");
+
+            // Save or update LignCreditProperty
+            var lign = await _context.Credit
+                .FirstOrDefaultAsync(x => x.CreditID == creditID);
+
+            lign.credit_statut = 6;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                message = "Submit enregistré avec succès."
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+
+    [HttpPost("saveSubmitDepotToValideByRE")]
+    public async Task<IActionResult> saveSubmitDepotToValideByRE(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int creditID = json.TryGetProperty("depotID", out JsonElement dossierIDoElement) && dossierIDoElement.ValueKind != JsonValueKind.Null
+                                ? dossierIDoElement.GetInt32()
+                                : 0;
+
+
+            if (creditID == 0)
+                return BadRequest("depotID est requis.");
+
+            // Save or update LignCreditProperty
+            var lign = await _context.CreditDepot
+                .FirstOrDefaultAsync(x => x.CreditDepotId == creditID);
+
+            lign.depot_statut = 1;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                message = "Submit enregistré avec succès."
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("saveSubmitDepotToRefusedByRE")]
+    public async Task<IActionResult> saveSubmitDepotToRefusedByRE(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int creditID = json.TryGetProperty("depotID", out JsonElement dossierIDoElement) && dossierIDoElement.ValueKind != JsonValueKind.Null
+                                ? dossierIDoElement.GetInt32()
+                                : 0;
+
+
+            if (creditID == 0)
+                return BadRequest("depotID est requis.");
+
+            // Save or update LignCreditProperty
+            var lign = await _context.CreditDepot
+                .FirstOrDefaultAsync(x => x.CreditDepotId == creditID);
+
+            lign.depot_statut = 2;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                message = "Submit enregistré avec succès."
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("saveSubmitDepotToValideByCPCC")]
+    public async Task<IActionResult> saveSubmitDepotToValideByCPCC(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int creditID = json.TryGetProperty("depotID", out JsonElement dossierIDoElement) && dossierIDoElement.ValueKind != JsonValueKind.Null
+                                ? dossierIDoElement.GetInt32()
+                                : 0;
+
+
+            if (creditID == 0)
+                return BadRequest("depotID est requis.");
+
+            // Save or update LignCreditProperty
+            var lign = await _context.CreditDepot
+                .FirstOrDefaultAsync(x => x.CreditDepotId == creditID);
+
+            lign.depot_statut = 3;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                message = "Submit enregistré avec succès."
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost("saveSubmitDepotToRefusedByCPCC")]
+    public async Task<IActionResult> saveSubmitDepotToRefusedByCPCC(dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            int creditID = json.TryGetProperty("depotID", out JsonElement dossierIDoElement) && dossierIDoElement.ValueKind != JsonValueKind.Null
+                                ? dossierIDoElement.GetInt32()
+                                : 0;
+
+
+            if (creditID == 0)
+                return BadRequest("depotID est requis.");
+
+            // Save or update LignCreditProperty
+            var lign = await _context.CreditDepot
+                .FirstOrDefaultAsync(x => x.CreditDepotId == creditID);
+
+            lign.depot_statut = 4;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status_code = 200,
+                success = true,
+                message = "Submit enregistré avec succès."
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
 
     [HttpPost("getGarantie")]
     public async Task<IActionResult> GetGarantie(dynamic entity)
@@ -2209,6 +2673,7 @@ public class CredirectController : ControllerBase
                     icon = "pi pi-play",
                     color = "#8ecae6",
                     is_accord = 0,
+                    user_bo = _context.Credit.AsNoTracking().Where(b => b.CreditID == depot.id_credit).Select(m => m.User_bo.Last_Name + " " + m.User_bo.First_Name).FirstOrDefault(),
                     @return = ""
                 });
 
@@ -2221,6 +2686,7 @@ public class CredirectController : ControllerBase
                     icon = "pi pi-send",
                     color = "#219ebc",
                     is_accord = 1,
+                    user_bo = _context.Credit.AsNoTracking().Where(b => b.CreditID == depot.id_credit).Select(m => m.User_bo.Last_Name + " " + m.User_bo.First_Name).FirstOrDefault(),
                     @return = ""
                 });
             }
@@ -2268,6 +2734,8 @@ public class CredirectController : ControllerBase
                     color = color,
                     is_accord = s.is_accord,
                     is_accord_client = s.is_accord_client,
+                    //user_bo = "-",
+                    user_bo = _context.UserBO.AsNoTracking().Where(b => b.Id == s.created_by).Select(m => m.Last_Name + " " + m.First_Name).FirstOrDefault(),
                     @return = s.message
                 });
             }
@@ -2321,6 +2789,10 @@ public class CredirectController : ControllerBase
             int? is_accord_client = null;
             string? message = null;
 
+            int userBoID = json.TryGetProperty("user_bo", out JsonElement userBoElement) && userBoElement.ValueKind != JsonValueKind.Null
+                                ? userBoElement.GetInt32()
+                                : 0;
+
             if (json.TryGetProperty("status", out JsonElement statusEl) && statusEl.ValueKind == JsonValueKind.Number)
                 status = statusEl.GetInt32();
 
@@ -2344,6 +2816,7 @@ public class CredirectController : ControllerBase
                 is_accord_client = is_accord_client,
                 status = status,
                 message = message,
+                created_by = userBoID,
                 created_at = DateTime.Now
             };
 
@@ -2378,7 +2851,7 @@ public class CredirectController : ControllerBase
                 from type in typeJoin.DefaultIfEmpty()
                 join bank in _context.AgencyBank on depot.id_agency_bank equals bank.AgencyBankID into bankJoin
                 from bank in bankJoin.DefaultIfEmpty()
-
+                where depot.depot_statut == 3 && credit.credit_statut == 6 // ✅ filtre ajouté ici
                 select new
                 {
                     depotId = depot.CreditDepotId,
@@ -2458,6 +2931,148 @@ public class CredirectController : ControllerBase
             return StatusCode(500, new { message = "Erreur serveur", detail = ex.Message });
         }
     }
+
+    [HttpPost("saveUserBo")]
+    public async Task<IActionResult> SaveUserBo([FromBody] dynamic entity)
+    {
+        try
+        {
+            JsonElement json = (JsonElement)entity;
+
+            // Extract values safely
+            int id = json.TryGetProperty("bo_id", out JsonElement idEl) && idEl.ValueKind == JsonValueKind.Number
+                     ? idEl.GetInt32()
+                     : 0;
+
+            string? firstName = json.TryGetProperty("bo_first_name", out JsonElement firstNameEl) && firstNameEl.ValueKind == JsonValueKind.String
+                     ? firstNameEl.GetString()
+                     : null;
+
+            string? lastName = json.TryGetProperty("bo_last_name", out JsonElement lastNameEl) && lastNameEl.ValueKind == JsonValueKind.String
+                     ? lastNameEl.GetString()
+                     : null;
+
+            string? email = json.TryGetProperty("bo_email", out JsonElement emailEl) && emailEl.ValueKind == JsonValueKind.String
+                     ? emailEl.GetString()
+                     : null;
+
+            string? password = json.TryGetProperty("bo_password", out JsonElement passwordEl) && passwordEl.ValueKind == JsonValueKind.String
+                     ? passwordEl.GetString()
+                     : null;
+
+            int role_id = json.TryGetProperty("bo_role", out JsonElement idElbo_role) && idElbo_role.ValueKind == JsonValueKind.Number
+                     ? idElbo_role.GetInt32()
+                     : 0;
+
+            // Basic validation
+            if (string.IsNullOrWhiteSpace(firstName) ||
+                string.IsNullOrWhiteSpace(lastName) ||
+                string.IsNullOrWhiteSpace(email))
+            {
+                return BadRequest("Champs obligatoires manquants.");
+            }
+
+            if (id > 0)
+            {
+                // UPDATE
+                var existingUser = await _context.UserBO.FindAsync(id);
+                if (existingUser == null)
+                {
+                    return NotFound($"Utilisateur avec ID {id} introuvable.");
+                }
+
+                existingUser.First_Name = firstName;
+                existingUser.Last_Name = lastName;
+                existingUser.Email = email;
+                existingUser.Password = password;
+
+                _context.UserBO.Update(existingUser);
+                await _context.SaveChangesAsync();
+
+                // UPDATE
+                var existingUserRole = await _context.UserBORoleBO.Where(b => b.UserId == existingUser.Id).FirstOrDefaultAsync();
+                if (existingUserRole == null)
+                {
+                    return NotFound($"Role avec ID {id} introuvable.");
+                }
+
+                existingUserRole.RoleId = role_id;
+
+                _context.UserBORoleBO.Update(existingUserRole);
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    status_code = 200,
+                    success = true,
+                    message = "Utilisateur mis à jour avec succès."
+                });
+            }
+            else
+            {
+                // CREATE
+                var newUser = new UserBO
+                {
+                    First_Name = firstName,
+                    Last_Name = lastName,
+                    Email = email,
+                    Password = password
+                };
+
+                _context.UserBO.Add(newUser);
+                await _context.SaveChangesAsync();
+
+                // CREATE
+                var newUserRole = new UserBORoleBO
+                {
+                    UserId = newUser.Id,
+                    RoleId = role_id,
+                };
+
+                _context.UserBORoleBO.Add(newUserRole);
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    status_code = 200,
+                    success = true,
+                    message = "Utilisateur ajouté avec succès.",
+                    id = newUser.Id
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur : {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Erreur serveur : {ex.Message}");
+        }
+    }
+
+    [HttpPost, Route("getUserBo"), Produces("application/json")]
+    public async Task<IActionResult> getUserBo(dynamic entity)
+    {
+        var folders = await _context.UserBO
+            .Select(s => new
+            {
+                s.Id,
+                s.First_Name,
+                s.Last_Name,
+                s.Email,
+                s.Password,
+                role = _context.UserBORoleBO.AsNoTracking().Where(b => b.UserId == s.Id).Select(n => n.Role ).FirstOrDefault()
+
+            })
+            .ToListAsync();
+
+        return Ok(new
+        {
+            success = true,
+            status_code = 200,
+            data = folders
+        });
+    }
+
+
 
     //public async Task<DataOutput> editEventCalendar(object record, int user_id)
     //{

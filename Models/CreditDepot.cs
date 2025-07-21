@@ -16,6 +16,7 @@
 		public int? updated_by { get; set; }
 		public DateTime? deleted_at { get; set; }
 		public int? deleted_by { get; set; }
+		public int? depot_statut { get; set; } = 0;
 
 	}
 

@@ -43,6 +43,7 @@ namespace credirect_api.Data
         public DbSet<Pensionnaire> Pensionnaire { get; set; }
         public DbSet<GarantieCredit> GarantieCredit { get; set; }
         public DbSet<DepotStatus> DepotStatus { get; set; }
+        public DbSet<CreditRemark> CreditRemark { get; set; }
         public DbSet<UserBO> UserBO { get; set; }
         public DbSet<RoleBO> RoleBO { get; set; }
         public DbSet<UserBORoleBO> UserBORoleBO { get; set; }
@@ -259,6 +260,11 @@ namespace credirect_api.Data
                 .WithMany()
                 .HasForeignKey(l => l.id_depot);
 
+            modelBuilder.Entity<CreditStatus>()
+                .HasOne(l => l.bo_user)
+                .WithMany()
+                .HasForeignKey(l => l.user_bo_id);
+
             modelBuilder.Entity<Pensionnaire>()
                 .HasOne(l => l.Client)
                 .WithMany()
@@ -288,6 +294,28 @@ namespace credirect_api.Data
                 .HasOne(l => l.Role)
                 .WithMany()
                 .HasForeignKey(l => l.RoleId);
+
+            modelBuilder.Entity<Client>()
+                .HasOne(l => l.User_bo)
+                .WithMany()
+                .HasForeignKey(l => l.created_by);
+
+            modelBuilder.Entity<Credit>()
+                .HasOne(l => l.User_bo)
+                .WithMany()
+                .HasForeignKey(l => l.created_by);
+
+            modelBuilder.Entity<CreditRemark>()
+                .HasOne(l => l.Credit)
+                .WithMany()
+                .HasForeignKey(l => l.id_credit);
+
+            modelBuilder.Entity<CreditRemark>()
+                .HasOne(l => l.User_bo)
+                .WithMany()
+                .HasForeignKey(l => l.userID);
+
+
         }
     }
 }

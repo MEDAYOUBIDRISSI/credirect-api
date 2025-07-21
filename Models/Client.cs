@@ -80,6 +80,9 @@
         public int? Nature_Bail { get; set; }
         public decimal? Rent { get; set; }
 
+        public int? created_by { get; set; }
+        public UserBO? User_bo { get; set; }
+
         public DateTime? deleted_at { get; set; }
 
     }

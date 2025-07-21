@@ -74,6 +74,33 @@ public class UtilityController : ControllerBase
         });// ✅ encapsule dans IActionResult
     }
 
+    [HttpPost, Route("getAllRoles"), Produces("application/json")]
+    public async Task<IActionResult> getAllRoles([FromBody] JsonElement fromFront)
+    {
+        var entity = await _context.RoleBO
+            .Select(t => new { label = t.Libelle, value = t.Id })
+            .AsNoTracking()
+            .ToListAsync();
+
+        if (entity == null || !entity.Any())
+        {
+            return Ok(new
+            {
+                success = true,
+                status_code = 401,
+                message = "not found."
+            });
+        }
+
+        return Ok(new
+        {
+            success = true,
+            status_code = 200,
+            message = "Roles found.",
+            data = entity
+        });// ✅ encapsule dans IActionResult
+    }
+
     [HttpPost, Route("getAllObjectCredit"), Produces("application/json")]
     public async Task<IActionResult> getAllObjectCredit([FromBody] JsonElement fromFront)
     {

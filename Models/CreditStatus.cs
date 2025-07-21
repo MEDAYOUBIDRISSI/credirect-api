@@ -13,6 +13,8 @@
 		public CreditDepot? CreditDepot { get; set; }
 		public DateTime? created_at { get; set; }
 		public int? created_by { get; set; }
+		public int? user_bo_id { get; set; }
+		public UserBO? bo_user { get; set; }
 		public DateTime? updated_at { get; set; }
 		public int? updated_by { get; set; }
 		public DateTime? deleted_at { get; set; }
